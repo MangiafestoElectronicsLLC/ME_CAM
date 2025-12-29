@@ -1,7 +1,7 @@
 flask
 pillow
 qrcode[pil]
-cryptography
+cryptography==39.0.0
 yagmail
 pydrive2
 psutil
