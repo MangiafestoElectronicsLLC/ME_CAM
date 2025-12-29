@@ -1,0 +1,9 @@
+flask
+pillow
+qrcode[pil]
+cryptography
+yagmail
+pydrive2
+psutil
+opencv-python
+numpy
