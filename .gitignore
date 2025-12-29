@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+config.json
+.env
+.motion_videos/
+encrypted_videos/
+*.log
+.vscode/
+.idea/
+.DS_Store
