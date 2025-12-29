@@ -1,9 +1,9 @@
 flask
 pillow
 qrcode[pil]
-cryptography==39.0.0
+cryptography==38.0.4
 yagmail
 pydrive2
 psutil
-opencv-python
-numpy
+opencv-python-headless==4.5.1.48
+numpy==1.19.5
