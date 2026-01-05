@@ -1,0 +1,30 @@
+{
+  "dashboard_pin_hash": "",
+  "camera": {
+    "source": 0,
+    "resolution": [1280, 720],
+    "fps": 15
+  },
+  "motion": {
+    "sensitivity": 0.5,
+    "min_area": 500
+  },
+  "ai": {
+    "person_detection_enabled": true,
+    "face_whitelist_enabled": false,
+    "tflite_model_path": "models/person_detection.tflite"
+  },
+  "storage": {
+    "encryption_enabled": true,
+    "recordings_dir": "recordings",
+    "max_days": 7
+  },
+  "alerts": {
+    "email_enabled": false,
+    "gdrive_enabled": false
+  },
+  "battery": {
+    "enabled": false,
+    "low_threshold_percent": 20
+  }
+}
