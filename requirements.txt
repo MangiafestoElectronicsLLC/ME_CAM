@@ -21,7 +21,8 @@ yagmail==0.15.293
 pydrive2==1.19.0
 
 # Optional AI (TFLite)
-tflite-runtime==2.5.0.post1
+tflite-runtime==2.7.0
+
 
 # Logging helpers
 loguru==0.7.2
