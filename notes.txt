@@ -1,38 +1,133 @@
 ME CAMERA – PI ZERO 2 W SURVIVAL NOTES
 ======================================
 
-This project ONLY works reliably on:
-- Raspberry Pi OS Legacy (Bullseye)
-- Python 3.9
+✅ OS: Raspberry Pi OS Legacy (Bullseye) Lite (32-bit)
+✅ Python: 3.9.18 (compiled or installed via apt)
+✅ Hardware: Raspberry Pi Zero 2 W
+
+This setup is fully compatible with:
 - OpenCV 4.5.1.48
-- NumPy 1.19.5
-
-Bookworm + Python 3.11 WILL NOT WORK.
-
---------------------------------------
-Fresh Install Steps
---------------------------------------
-1. Flash Raspberry Pi OS Legacy (Bullseye) Lite
-2. Boot Pi and SSH in:
-   ssh pi@raspberrypi.local
-3. Clone repo:
-   git clone -b DEV https://github.com/MangiafestoElectronicsLLC/ME_CAM.git
-4. Create Python 3.9 venv:
-   python3.9 -m venv venv
-   source venv/bin/activate
-5. Install dependencies:
-   pip install -r requirements.txt
-6. Run:
-   python3 main.py
+- NumPy 1.20.x
+- TFLite Runtime 2.7.0
+- PiWheels ARMv7 wheels
+- libwebp.so.6 and libIlmImf-2_5.so.25
 
 --------------------------------------
-Run on Boot
+1. Flash Bullseye Lite
 --------------------------------------
-sudo systemctl enable mecamera
+Use Raspberry Pi Imager:
+- Choose OS → Raspberry Pi OS (Other) → Raspberry Pi OS (Legacy) → Raspberry Pi OS Lite (Legacy)
+- Enable SSH, set Wi-Fi, username/password
+- Flash SD card and boot Pi
+
+--------------------------------------
+2. System Setup
+--------------------------------------
+ssh pi@raspberrypi.local
+
+sudo apt update
+sudo apt upgrade -y
+
+sudo apt install -y \
+python3.9 python3.9-venv python3.9-dev \
+libatlas-base-dev liblapack-dev gfortran \
+libjpeg-dev zlib1g-dev libopenjp2-7 libtiff-dev \
+libssl-dev libffi-dev libcamera-dev libcamera-apps \
+libopenexr25 libilmbase25 openexr git
+
+--------------------------------------
+3. Clone ME Camera
+--------------------------------------
+cd ~
+git clone -b DEV https://github.com/MangiafestoElectronicsLLC/ME_CAM.git
+cd ME_CAM
+
+--------------------------------------
+4. Create Python 3.9 venv
+--------------------------------------
+python3.9 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+
+--------------------------------------
+5. Install Dependencies
+--------------------------------------
+Use this exact requirements.txt:
+
+Flask==2.2.5  
+Werkzeug==2.2.3  
+numpy==1.20.3  
+opencv-python-headless==4.5.1.48  
+Pillow==9.5.0  
+cryptography==39.0.0  
+psutil==5.9.5  
+qrcode[pil]==7.4.2  
+yagmail==0.15.293  
+pydrive2==1.19.0  
+tflite-runtime==2.7.0  
+loguru==0.7.2
+
+Then install:
+
+pip install -r requirements.txt
+
+--------------------------------------
+6. Run ME Camera
+--------------------------------------
+source venv/bin/activate
+python3 main.py
+
+Open in browser:
+http://raspberrypi.local:8080
+
+--------------------------------------
+7. Known Runtime Behavior
+--------------------------------------
+- If `models/person_detection.tflite` is missing, the pipeline will crash repeatedly.
+  → Add model to `models/` folder or disable AI detection in config.
+
+- If no camera is connected, OpenCV will log:
+  `can't open camera by index`
+
+- If PIN is entered and app crashes:
+  → Check `config/config.json` for malformed entries
+  → Confirm `config_manager.py` handles PIN correctly
+  → Logs will show traceback — fix or disable PIN in config
+
+--------------------------------------
+8. Run on Boot (systemd)
+--------------------------------------
+sudo nano /etc/systemd/system/mecamera.service
+
+[Unit]
+Description=ME Camera Service
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/ME_CAM
+ExecStart=/home/pi/ME_CAM/venv/bin/python3 /home/pi/ME_CAM/main.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+Enable:
+
+sudo systemctl daemon-reload  
+sudo systemctl enable mecamera  
 sudo systemctl start mecamera
 
 --------------------------------------
-Useful Commands
+9. Reset Everything
+--------------------------------------
+rm -rf ~/ME_CAM  
+rm -rf ~/Python-3.9.18*  
+sudo apt autoremove -y  
+sudo apt clean
+
+--------------------------------------
+10. Useful Commands
 --------------------------------------
 Check service:
 systemctl status mecamera
@@ -40,13 +135,11 @@ systemctl status mecamera
 View logs:
 journalctl -u mecamera -f
 
---------------------------------------
-Reset Everything
---------------------------------------
-rm -rf ~/ME_CAM
-rm -rf ~/ME_CAM/venv
-sudo apt autoremove -y
-sudo apt clean
+Stop service:
+sudo systemctl stop mecamera
+
+Restart service:
+sudo systemctl restart mecamera
 
 --------------------------------------
 END OF NOTES
