@@ -20,8 +20,8 @@ def get_config():
     global _config_cache
     with _lock:
         if _config_cache is None:
+            os.makedirs("config", exist_ok=True)
             if not os.path.exists(CONFIG_PATH):
-                os.makedirs("config", exist_ok=True)
                 default = _load_json(DEFAULT_CONFIG_PATH)
                 with open(CONFIG_PATH, "w") as f:
                     json.dump(default, f, indent=2)
@@ -31,7 +31,7 @@ def get_config():
         return _config_cache
 
 
-def save_config(new_config):
+def save_config(new_config: dict):
     global _config_cache
     with _lock:
         os.makedirs("config", exist_ok=True)
