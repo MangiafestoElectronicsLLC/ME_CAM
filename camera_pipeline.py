@@ -1,124 +1,108 @@
 import os
-import cv2
 import time
-from threading import Event
-from typing import Optional
+import cv2
+from loguru import logger
+from datetime import datetime, timedelta
 
-from config_manager import load_config
+from config_manager import get_config
+from ai_person_detector import PersonDetector
 from motion_detector import MotionDetector
 from smart_motion_filter import SmartMotionFilter
-from ai_person_detector import PersonDetector
-from face_recognition_whitelist import FaceWhitelist
-from battery_monitor import BatteryMonitor
-from cloud.email_notifier import EmailNotifier
-from cloud.gdrive_uploader import GDriveUploader
-from utils.logger import get_logger
-
-logger = get_logger("camera_pipeline")
 
 
 class CameraPipeline:
-    def __init__(self, stop_event: Event):
+    def __init__(self, stop_event, preview_only=False):
         self.stop_event = stop_event
-        self.config = load_config()
+        self.preview_only = preview_only
 
-        cam_cfg = self.config["camera"]
-        self.cap = cv2.VideoCapture(cam_cfg["source"])
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_cfg["resolution"][0])
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_cfg["resolution"][1])
-        self.cap.set(cv2.CAP_PROP_FPS, cam_cfg["fps"])
+        cfg = get_config()
+        self.storage_cfg = cfg["storage"]
+        self.det_cfg = cfg["detection"]
 
-        mot_cfg = self.config["motion"]
+        self.person_detector = PersonDetector("models/person_detection.tflite")
         self.motion_detector = MotionDetector(
-            sensitivity=mot_cfg["sensitivity"],
-            min_area=mot_cfg["min_area"],
+            min_area=self.det_cfg.get("min_motion_area", 500)
         )
-        self.motion_filter = SmartMotionFilter()
+        self.smart_filter = SmartMotionFilter()
 
-        ai_cfg = self.config["ai"]
-        self.person_detector = PersonDetector(
-            model_path=ai_cfg["tflite_model_path"],
-            enabled=ai_cfg["person_detection_enabled"],
-        )
-        self.face_whitelist = FaceWhitelist(enabled=ai_cfg["face_whitelist_enabled"])
-
-        bat_cfg = self.config["battery"]
-        self.battery_monitor = BatteryMonitor(
-            enabled=bat_cfg["enabled"],
-            low_threshold_percent=bat_cfg["low_threshold_percent"],
-        )
-
-        alert_cfg = self.config["alerts"]
-        self.email_notifier = EmailNotifier(enabled=alert_cfg["email_enabled"])
-        self.gdrive_uploader = GDriveUploader(enabled=alert_cfg["gdrive_enabled"])
-
-        self.recordings_dir = self.config["storage"]["recordings_dir"]
+        self.recordings_dir = self.storage_cfg["recordings_dir"]
         os.makedirs(self.recordings_dir, exist_ok=True)
 
-        self.current_writer: Optional[cv2.VideoWriter] = None
-        self.recording = False
+        self._last_motion_clip = None
 
-    def get_battery_status(self):
-        return self.battery_monitor.get_status()
-
-    def _start_recording(self, frame):
-        ts = time.strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(self.recordings_dir, f"event_{ts}.mp4")
-
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        h, w = frame.shape[:2]
-        fps = self.config["camera"]["fps"]
-        self.current_writer = cv2.VideoWriter(path, fourcc, fps, (w, h))
-        self.recording = True
-        logger.info(f"Recording started: {path}")
-        return path
-
-    def _stop_recording(self):
-        if self.current_writer:
-            self.current_writer.release()
-        self.current_writer = None
-        self.recording = False
-        logger.info("Recording stopped.")
+        self.camera_index = 0
+        self.cap = cv2.VideoCapture(self.camera_index)
+        if not self.cap.isOpened():
+            logger.warning("[CAMERA] Could not open /dev/video0")
 
     def run(self):
-        if not self.cap.isOpened():
-            logger.error("Camera failed to open.")
-            return
+        logger.info("[PIPELINE] Camera pipeline started.")
+        self._cleanup_old_recordings()
 
-        last_path = None
+        fourcc = cv2.VideoWriter_fourcc(*"XVID")
+        out = None
+        recording = False
+        last_motion_time = None
+        motion_timeout = 5  # seconds after last detection to stop recording
 
         while not self.stop_event.is_set():
             ret, frame = self.cap.read()
             if not ret:
-                logger.error("Failed to read frame from camera.")
-                time.sleep(1)
+                time.sleep(0.2)
                 continue
 
-            if self.motion_detector.detect(frame):
-                if self.motion_filter.register_motion():
-                    if self.person_detector.is_person_present(frame) and \
-                       self.face_whitelist.is_face_whitelisted(frame):
+            motion_mask = self.motion_detector.detect(frame)
+            motion_detected = self.smart_filter.is_motion_significant(motion_mask)
 
-                        if not self.recording:
-                            last_path = self._start_recording(frame)
-                        if self.current_writer:
-                            self.current_writer.write(frame)
-                    else:
-                        logger.info("Motion not confirmed by AI filters.")
-                elif self.recording and self.current_writer:
-                    self.current_writer.write(frame)
+            person_present = False
+            if self.det_cfg.get("person_only", True) and self.person_detector.enabled:
+                person_present = self.person_detector.has_person(frame)
             else:
-                if self.recording:
-                    self._stop_recording()
-                    if last_path:
-                        self.email_notifier.send_alert(
-                            "ME Camera Event",
-                            f"New event recorded: {last_path}",
-                        )
-                        self.gdrive_uploader.upload_file(last_path)
+                person_present = motion_detected
 
-            time.sleep(0.01)
+            event_trigger = motion_detected and person_present
 
-        if self.recording:
-            self._stop_recording()
-        self.cap.release()
+            if event_trigger and not recording and not self.preview_only:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                clip_path = os.path.join(self.recordings_dir, f"motion_{timestamp}.avi")
+                h, w = frame.shape[:2]
+                out = cv2.VideoWriter(clip_path, fourcc, 10.0, (w, h))
+                recording = True
+                last_motion_time = time.time()
+                self._last_motion_clip = clip_path
+                logger.info(f"[RECORD] Started motion recording: {clip_path}")
+
+            if recording and out is not None:
+                out.write(frame)
+                if event_trigger:
+                    last_motion_time = time.time()
+                elif time.time() - last_motion_time > motion_timeout:
+                    logger.info("[RECORD] Stopping motion recording.")
+                    out.release()
+                    out = None
+                    recording = False
+
+            if self.preview_only:
+                break
+
+        if self.cap:
+            self.cap.release()
+        if out:
+            out.release()
+        logger.info("[PIPELINE] Camera pipeline stopped.")
+
+    def _cleanup_old_recordings(self):
+        retention_days = self.storage_cfg.get("retention_days", 7)
+        cutoff = datetime.now() - timedelta(days=retention_days)
+        for fname in os.listdir(self.recordings_dir):
+            fpath = os.path.join(self.recordings_dir, fname)
+            try:
+                mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
+                if mtime < cutoff:
+                    os.remove(fpath)
+                    logger.info(f"[CLEANUP] Removed old recording: {fpath}")
+            except Exception as e:
+                logger.warning(f"[CLEANUP] Error removing {fpath}: {e}")
+
+    def get_last_motion_clip(self):
+        return self._last_motion_clip
