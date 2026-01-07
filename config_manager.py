@@ -1,75 +1,57 @@
 import json
 import os
-import hashlib
-from typing import Any, Dict
-from utils.logger import get_logger
+from threading import RLock
 
-logger = get_logger("config_manager")
+CONFIG_PATH = "config/config.json"
+DEFAULT_CONFIG_PATH = "config/config_default.json"
 
-CONFIG_DIR = "config"
-CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
-DEFAULT_CONFIG_PATH = os.path.join(CONFIG_DIR, "config_default.json")
+_lock = RLock()
+_config_cache = None
 
 
-def _ensure_config_dir():
-    os.makedirs(CONFIG_DIR, exist_ok=True)
+def _load_json(path):
+    if not os.path.exists(path):
+        return {}
+    with open(path, "r") as f:
+        return json.load(f)
 
 
-def load_config() -> Dict[str, Any]:
-    _ensure_config_dir()
-    if not os.path.exists(CONFIG_PATH):
-        logger.info("Config not found, creating from default.")
-        reset_to_default()
-    with open(CONFIG_PATH, "r") as f:
-        data = json.load(f)
-    return data
+def get_config():
+    global _config_cache
+    with _lock:
+        if _config_cache is None:
+            if not os.path.exists(CONFIG_PATH):
+                os.makedirs("config", exist_ok=True)
+                default = _load_json(DEFAULT_CONFIG_PATH)
+                with open(CONFIG_PATH, "w") as f:
+                    json.dump(default, f, indent=2)
+                _config_cache = default
+            else:
+                _config_cache = _load_json(CONFIG_PATH)
+        return _config_cache
 
 
-def save_config(config: Dict[str, Any]) -> None:
-    _ensure_config_dir()
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(config, f, indent=4)
-    logger.info("Config saved.")
+def save_config(new_config):
+    global _config_cache
+    with _lock:
+        os.makedirs("config", exist_ok=True)
+        with open(CONFIG_PATH, "w") as f:
+            json.dump(new_config, f, indent=2)
+        _config_cache = new_config
 
 
-def reset_to_default() -> None:
-    _ensure_config_dir()
-    if not os.path.exists(DEFAULT_CONFIG_PATH):
-        raise FileNotFoundError("Default config file missing.")
-    with open(DEFAULT_CONFIG_PATH, "r") as f:
-        default = json.load(f)
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(default, f, indent=4)
-    logger.info("Config reset to default.")
+def update_config(updates: dict):
+    cfg = get_config()
+    cfg.update(updates)
+    save_config(cfg)
 
 
-def export_config(export_path: str) -> None:
-    config = load_config()
-    with open(export_path, "w") as f:
-        json.dump(config, f, indent=4)
-    logger.info(f"Config exported to {export_path}")
+def is_first_run():
+    cfg = get_config()
+    return not cfg.get("first_run_completed", False)
 
 
-def import_config(import_path: str) -> None:
-    with open(import_path, "r") as f:
-        config = json.load(f)
-    save_config(config)
-    logger.info(f"Config imported from {import_path}")
-
-
-def hash_pin(pin: str) -> str:
-    return hashlib.sha256(pin.encode("utf-8")).hexdigest()
-
-
-def set_dashboard_pin(pin: str) -> None:
-    config = load_config()
-    config["dashboard_pin_hash"] = hash_pin(pin)
-    save_config(config)
-
-
-def verify_dashboard_pin(pin: str) -> bool:
-    config = load_config()
-    stored = config.get("dashboard_pin_hash", "")
-    if not stored:
-        return False
-    return stored == hash_pin(pin)
+def mark_first_run_complete():
+    cfg = get_config()
+    cfg["first_run_completed"] = True
+    save_config(cfg)
