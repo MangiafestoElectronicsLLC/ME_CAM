@@ -56,7 +56,9 @@ class CameraPipeline:
 
             person_present = False
             if self.det_cfg.get("person_only", True) and self.person_detector.enabled:
-                person_present = self.person_detector.has_person(frame)
+                person_present = self.person_detector.has_person(
+                    frame, threshold=self.det_cfg.get("sensitivity", 0.6)
+                )
             else:
                 person_present = motion_detected
 
