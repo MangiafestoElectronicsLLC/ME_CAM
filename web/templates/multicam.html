@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <title>ME Camera - Multi-Camera Dashboard</title>
+  <style>
+    .cam-grid { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .cam {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      width: 300px;
+    }
+    .cam iframe {
+      width: 100%;
+      height: 200px;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Multi-Camera Dashboard</h1>
+  <div class="cam-grid">
+    {% for dev in devices %}
+      <div class="cam">
+        <h3>{{ dev.name }}</h3>
+        <iframe src="{{ dev.url }}"></iframe>
+        <p><a href="{{ dev.url }}" target="_blank">Open Full Dashboard</a></p>
+      </div>
+    {% endfor %}
+  </div>
+</body>
+</html>
