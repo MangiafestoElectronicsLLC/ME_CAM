@@ -116,3 +116,122 @@ git push origin main
 END OF NOTES
 --------------------------------------------
 
+1. First Boot Setup
+SSH into the Pi:
+
+bash
+ssh pi@<your-pi-ip> 
+or
+ssh pi@raspberrypi.local
+
+
+Update system:
+sudo apt update && sudo apt full-upgrade -y
+sudo reboot
+
+2. Install System Dependencies
+Your project uses OpenCV, TensorFlow Lite, Flask, and camera stack components.
+Install everything required:
+sudo apt install -y \
+    python3 python3-pip python3-venv \
+    libatlas-base-dev \
+    libjpeg-dev libtiff5-dev libjasper-dev libpng-dev \
+    libavcodec-dev libavformat-dev libswscale-dev \
+    libv4l-dev v4l-utils \
+    libgtk2.0-dev \
+    libopenblas-dev liblapack-dev \
+    git
+
+Clone the DEV Branch
+cd ~
+git clone -b DEV https://github.com/MangiafestoElectronicsLLC/ME_CAM.git
+cd ME_CAM
+
+
+4. Create Virtual Environment
+Your repo expects Python 3.9 (Bullseye ships with 3.9)
+
+python3 -m venv venv
+source venv/bin/activate
+
+
+5. Install Python Dependencies
+Your requirements.txt includes OpenCV, Flask, TFLite runtime, etc. Install them:
+
+pip install --upgrade pip
+pip install -r requirements.txt
+
+If TensorFlow Lite fails (common on Pi Zero), install the correct wheel:
+pip install https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.7.0-cp39-cp39-linux_armv7l.whl
+
+6. Run the Setup Script
+Your repo includes a setup.sh script for first‑run configuration.
+
+Make it executable:
+chmod +x setup.sh
+./setup.sh
+
+This script:
+
+Creates config directories
+
+Copies default config
+
+Prepares storage paths
+
+Sets permissions
+
+▶️ 7. Test the Camera Pipeline
+Run the main program manually:
+
+python3 main.py
+
+You should see logs from:
+
+camera_pipeline.py
+
+motion_detector.py
+
+ai_person_detector.py
+
+web_dashboard.py
+
+If the dashboard loads, visit:
+
+Code
+http://<pi-ip>:5000
+🔁 8. Install the Systemd Service
+Your repo includes a service file at:
+
+Code
+etc/systemd/system/mecamera.service
+
+Install it:
+
+bash
+sudo cp etc/systemd/system/mecamera.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable mecamera.service
+sudo systemctl start mecamera.service
+Check logs:
+
+bash
+sudo journalctl -u mecamera.service -f
+🔐 Optional: WireGuard Setup
+Your repo includes a full guide at:
+docs/wireguard_setup.md
+
+🎉 Deployment Complete
+At this point:
+
+The camera boots automatically
+
+The dashboard is available on port 5000
+
+Motion/person detection runs continuously
+
+Clips are stored + encrypted (if enabled)
+
+Notifications (email/GDrive) work once configured
+
+
