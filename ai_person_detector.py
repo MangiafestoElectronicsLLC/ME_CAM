@@ -1,7 +1,7 @@
-import cv2
 import os
 import numpy as np
 from loguru import logger
+import cv2
 import tflite_runtime.interpreter as tflite
 
 
@@ -36,6 +36,5 @@ class PersonDetector:
         self.interpreter.invoke()
         output = self.interpreter.get_tensor(self.output_index)
 
-        # Assuming output is [1,1] with probability of person
-        prob = float(output.flatten()[0])
+        prob = float(output.flatten()[0])  # assuming person probability
         return prob >= threshold
