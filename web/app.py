@@ -1,155 +1,133 @@
-import os
 from flask import (
-    Flask,
-    render_template,
-    request,
-    redirect,
-    url_for,
-    session,
-    send_file,
-    flash,
+    Flask, render_template, request, redirect,
+    url_for, session, send_from_directory, jsonify
 )
-from werkzeug.utils import secure_filename
+from threading import Event
+from loguru import logger
+import os
 
-from config_manager import (
-    load_config,
-    save_config,
-    verify_dashboard_pin,
-    set_dashboard_pin,
-    export_config,
-    import_config,
-)
-from watchdog import CameraWatchdog
-from utils.logger import get_logger
-
-logger = get_logger("web_dashboard")
+from config_manager import get_config, save_config, is_first_run, mark_first_run_complete
+from watchdog import CameraWatchdog  # your existing watchdog
+from camera_pipeline import CameraPipeline
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("ME_CAMERA_SECRET_KEY", "dev-secret-key")
-
-EXPORT_DIR = "exports"
-os.makedirs(EXPORT_DIR, exist_ok=True)
+app.secret_key = os.urandom(24)
 
 watchdog = CameraWatchdog()
+watchdog.start()  # starts pipeline thread on boot
 
 
-def is_authenticated() -> bool:
-    return session.get("logged_in", False)
+@app.before_request
+def ensure_first_run_redirect():
+    if request.path.startswith("/static"):
+        return
+    cfg = get_config()
+    if is_first_run() and request.path not in ("/setup", "/setup/save"):
+        return redirect(url_for("setup"))
 
 
-@app.before_first_request
-def start_pipeline():
-    watchdog_thread = os.environ.get("ME_CAMERA_NO_PIPELINE", "0")
-    if watchdog_thread == "0":
-        from threading import Thread
-        t = Thread(target=watchdog.supervise, daemon=True)
-        t.start()
-        logger.info("Camera watchdog started from Flask app.")
+@app.route("/setup", methods=["GET"])
+def setup():
+    cfg = get_config()
+    return render_template("first_run.html", config=cfg)
+
+
+@app.route("/setup/save", methods=["POST"])
+def setup_save():
+    cfg = get_config()
+
+    cfg["device_name"] = request.form.get("device_name", cfg["device_name"])
+
+    # PIN
+    pin_enabled = request.form.get("pin_enabled") == "on"
+    pin_code = request.form.get("pin_code") or cfg["pin_code"]
+    cfg["pin_enabled"] = pin_enabled
+    cfg["pin_code"] = pin_code
+
+    # Email
+    cfg["email"]["enabled"] = request.form.get("email_enabled") == "on"
+    cfg["email"]["smtp_server"] = request.form.get("smtp_server", "")
+    cfg["email"]["smtp_port"] = int(request.form.get("smtp_port") or 587)
+    cfg["email"]["username"] = request.form.get("email_username", "")
+    cfg["email"]["password"] = request.form.get("email_password", "")
+    cfg["email"]["from_address"] = request.form.get("email_from", "")
+    cfg["email"]["to_address"] = request.form.get("email_to", "")
+
+    # Google Drive
+    cfg["google_drive"]["enabled"] = request.form.get("gdrive_enabled") == "on"
+    cfg["google_drive"]["folder_id"] = request.form.get("gdrive_folder_id", "")
+
+    # Storage
+    cfg["storage"]["retention_days"] = int(request.form.get("retention_days") or 7)
+    cfg["storage"]["motion_only"] = (request.form.get("motion_only") == "on")
+
+    # Detection
+    cfg["detection"]["person_only"] = (request.form.get("person_only") == "on")
+    cfg["detection"]["sensitivity"] = float(request.form.get("sensitivity") or 0.6)
+
+    save_config(cfg)
+    mark_first_run_complete()
+    logger.info("[SETUP] First run completed.")
+    return redirect(url_for("index"))
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    config = load_config()
+    cfg = get_config()
     if request.method == "POST":
-        pin = request.form.get("pin", "")
-        if not config.get("dashboard_pin_hash"):
-            # First time: set PIN
-            if not pin:
-                flash("PIN required.")
-            else:
-                set_dashboard_pin(pin)
-                session["logged_in"] = True
-                return redirect(url_for("index"))
-        else:
-            if verify_dashboard_pin(pin):
-                session["logged_in"] = True
+        pin = request.form.get("pin")
+        try:
+            if not cfg.get("pin_enabled", True) or pin == cfg.get("pin_code"):
+                session["authenticated"] = True
                 return redirect(url_for("index"))
             else:
-                flash("Invalid PIN.")
+                return render_template("login.html", error="Invalid PIN")
+        except Exception as e:
+            logger.warning(f"[PIN] Crash during PIN check: {e}")
+            return render_template("login.html", error="PIN error, check config.")
     return render_template("login.html")
 
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
+def require_auth():
+    cfg = get_config()
+    if cfg.get("pin_enabled", True) and not session.get("authenticated"):
+        return False
+    return True
 
 
 @app.route("/")
 def index():
-    if not is_authenticated():
+    if not require_auth():
         return redirect(url_for("login"))
 
-    from camera_pipeline import CameraPipeline
-    from threading import Event
-
-    # temporary pipeline for status only (you may want a shared instance)
-    temp_pipeline = CameraPipeline(Event())
-    battery = temp_pipeline.get_battery_status()
-
-    config = load_config()
-    return render_template(
-        "index.html",
-        battery=battery,
-        alerts=config["alerts"],
-        motion=config["motion"],
-    )
+    try:
+        temp_pipeline = CameraPipeline(Event(), preview_only=True)
+        status = watchdog.status()
+        return render_template("dashboard.html", status=status)
+    except Exception as e:
+        logger.warning(f"[DASHBOARD] Fallback triggered: {e}")
+        return render_template(
+            "fallback.html",
+            message="Camera pipeline unavailable. Check camera, model file, or config.",
+        )
 
 
-@app.route("/config", methods=["GET", "POST"])
-def config_page():
-    if not is_authenticated():
-        return redirect(url_for("login"))
-
-    config = load_config()
-    if request.method == "POST":
-        sensitivity = float(request.form.get("sensitivity", 0.5))
-        config["motion"]["sensitivity"] = sensitivity
-        save_config(config)
-        flash("Configuration updated.")
-        return redirect(url_for("config_page"))
-
-    return render_template("config.html", config=config)
+@app.route("/api/status")
+def api_status():
+    return jsonify(watchdog.status())
 
 
-@app.route("/config/export")
-def config_export():
-    if not is_authenticated():
-        return redirect(url_for("login"))
-
-    export_path = os.path.join(EXPORT_DIR, "config_export.json")
-    export_config(export_path)
-    return send_file(export_path, as_attachment=True)
-
-
-@app.route("/config/import", methods=["POST"])
-def config_import():
-    if not is_authenticated():
-        return redirect(url_for("login"))
-
-    file = request.files.get("file")
-    if not file:
-        flash("No file provided.")
-        return redirect(url_for("config_page"))
-
-    filename = secure_filename(file.filename)
-    path = os.path.join(EXPORT_DIR, filename)
-    file.save(path)
-    import_config(path)
-    flash("Configuration imported.")
-    return redirect(url_for("config_page"))
-
-
-@app.route("/shutdown", methods=["POST"])
-def shutdown():
-    if not is_authenticated():
-        return redirect(url_for("login"))
-
-    # Safe shutdown: stop pipeline and then power off OS
-    watchdog.stop()
-    os.system("sudo shutdown -h now")
-    return "Shutting down...", 200
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+@app.route("/api/trigger_emergency", methods=["POST"])
+def trigger_emergency():
+    """
+    Hook to send latest motion clip to 'first responders'.
+    In practice: upload to GDrive, send email with link, hit webhook, etc.
+    """
+    try:
+        last_clip = watchdog.get_last_motion_clip()
+        # TODO: implement email/gdrive/webhook integration here
+        logger.info(f"[EMERGENCY] Triggered for clip: {last_clip}")
+        return jsonify({"ok": True, "clip": last_clip})
+    except Exception as e:
+        logger.error(f"[EMERGENCY] Failed: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
