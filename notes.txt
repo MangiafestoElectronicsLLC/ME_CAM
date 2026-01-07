@@ -1,146 +1,118 @@
-ME CAMERA – PI ZERO 2 W SURVIVAL NOTES
-======================================
+ME CAMERA – PI ZERO 2 W COMPLETE SETUP GUIDE
+============================================
 
-✅ OS: Raspberry Pi OS Legacy (Bullseye) Lite (32-bit)
-✅ Python: 3.9.18 (compiled or installed via apt)
-✅ Hardware: Raspberry Pi Zero 2 W
+This guide walks from a blank SD card → fully running ME Camera with auto-boot.
 
-This setup is fully compatible with:
-- OpenCV 4.5.1.48
-- NumPy 1.20.x
-- TFLite Runtime 2.7.0
-- PiWheels ARMv7 wheels
-- libwebp.so.6 and libIlmImf-2_5.so.25
-
---------------------------------------
-1. Flash Bullseye Lite
---------------------------------------
+--------------------------------------------
+1. FLASH RASPBERRY PI OS (LEGACY) BULLSEYE
+--------------------------------------------
 Use Raspberry Pi Imager:
-- Choose OS → Raspberry Pi OS (Other) → Raspberry Pi OS (Legacy) → Raspberry Pi OS Lite (Legacy)
-- Enable SSH, set Wi-Fi, username/password
-- Flash SD card and boot Pi
 
---------------------------------------
-2. System Setup
---------------------------------------
+Choose OS →
+  Raspberry Pi OS (Other) →
+    Raspberry Pi OS (Legacy) →
+      Raspberry Pi OS Lite (Legacy)
+
+Enable:
+- SSH
+- Wi-Fi
+- Username/password
+
+Flash SD card and boot Pi.
+
+--------------------------------------------
+2. CONNECT TO THE PI
+--------------------------------------------
 ssh pi@raspberrypi.local
 
-sudo apt update
-sudo apt upgrade -y
+--------------------------------------------
+3. CLEAN ANY OLD INSTALLS
+--------------------------------------------
+sudo systemctl stop mecamera 2>/dev/null
+sudo systemctl disable mecamera 2>/dev/null
+sudo rm -f /etc/systemd/system/mecamera.service
+sudo systemctl daemon-reload
 
-sudo apt install -y \
-python3.9 python3.9-venv python3.9-dev \
-libatlas-base-dev liblapack-dev gfortran \
-libjpeg-dev zlib1g-dev libopenjp2-7 libtiff-dev \
-libssl-dev libffi-dev libcamera-dev libcamera-apps \
-libopenexr25 libilmbase25 openexr git
+rm -rf ~/ME_CAM
+rm -rf ~/.cache/pip
+sudo apt autoremove -y
+sudo apt clean
 
---------------------------------------
-3. Clone ME Camera
---------------------------------------
+--------------------------------------------
+4. CLONE THE ME_CAMERA REPOSITORY
+--------------------------------------------
 cd ~
 git clone -b DEV https://github.com/MangiafestoElectronicsLLC/ME_CAM.git
 cd ME_CAM
 
---------------------------------------
-4. Create Python 3.9 venv
---------------------------------------
-python3.9 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
+--------------------------------------------
+5. RUN THE AUTOMATED INSTALLER
+--------------------------------------------
+chmod +x setup.sh
+./setup.sh
 
---------------------------------------
-5. Install Dependencies
---------------------------------------
-Use this exact requirements.txt:
+This installs:
+- Python 3.9 venv
+- OpenCV
+- NumPy
+- TFLite
+- Email + Google Drive dependencies
+- Config folders
 
-Flask==2.2.5  
-Werkzeug==2.2.3  
-numpy==1.20.3  
-opencv-python-headless==4.5.1.48  
-Pillow==9.5.0  
-cryptography==39.0.0  
-psutil==5.9.5  
-qrcode[pil]==7.4.2  
-yagmail==0.15.293  
-pydrive2==1.19.0  
-tflite-runtime==2.7.0  
-loguru==0.7.2
-
-Then install:
-
-pip install -r requirements.txt
-
---------------------------------------
-6. Run ME Camera
---------------------------------------
+--------------------------------------------
+6. RUN ME CAMERA MANUALLY (FIRST TIME)
+--------------------------------------------
 source venv/bin/activate
 python3 main.py
 
 Open in browser:
 http://raspberrypi.local:8080
 
---------------------------------------
-7. Known Runtime Behavior
---------------------------------------
-- If `models/person_detection.tflite` is missing, the pipeline will crash repeatedly.
-  → Add model to `models/` folder or disable AI detection in config.
+You will see the FIRST RUN SETUP WIZARD.
 
-- If no camera is connected, OpenCV will log:
-  `can't open camera by index`
-
-- If PIN is entered and app crashes:
-  → Check `config/config.json` for malformed entries
-  → Confirm `config_manager.py` handles PIN correctly
-  → Logs will show traceback — fix or disable PIN in config
-
---------------------------------------
-8. Run on Boot (systemd)
---------------------------------------
-sudo nano /etc/systemd/system/mecamera.service
-
-[Unit]
-Description=ME Camera Service
-After=network.target
-
-[Service]
-User=pi
-WorkingDirectory=/home/pi/ME_CAM
-ExecStart=/home/pi/ME_CAM/venv/bin/python3 /home/pi/ME_CAM/main.py
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-
-Enable:
-
-sudo systemctl daemon-reload  
-sudo systemctl enable mecamera  
+--------------------------------------------
+7. ENABLE AUTO-BOOT
+--------------------------------------------
+sudo cp systemd/mecamera.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable mecamera
 sudo systemctl start mecamera
 
---------------------------------------
-9. Reset Everything
---------------------------------------
-rm -rf ~/ME_CAM  
-rm -rf ~/Python-3.9.18*  
-sudo apt autoremove -y  
-sudo apt clean
+--------------------------------------------
+8. EMERGENCY BUTTON
+--------------------------------------------
+Dashboard → “Send Last Clip to First Responders”
 
---------------------------------------
-10. Useful Commands
---------------------------------------
-Check service:
-systemctl status mecamera
+This:
+- Uploads clip to Google Drive (if enabled)
+- Emails clip + link (if enabled)
 
-View logs:
-journalctl -u mecamera -f
+--------------------------------------------
+9. FACTORY RESET
+--------------------------------------------
+./factory_reset.sh
 
-Stop service:
-sudo systemctl stop mecamera
+This wipes:
+- config.json
+- recordings
+- exports
 
-Restart service:
-sudo systemctl restart mecamera
+--------------------------------------------
+10. SELF UPDATE
+--------------------------------------------
+./self_update.sh
 
---------------------------------------
+Pulls latest DEV branch, reinstalls dependencies, restarts service.
+
+--------------------------------------------
+11. READY FOR MAIN BRANCH
+--------------------------------------------
+Once tested:
+git checkout main
+git merge DEV
+git push origin main
+
+--------------------------------------------
 END OF NOTES
---------------------------------------
+--------------------------------------------
+
