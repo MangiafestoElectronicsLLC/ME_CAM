@@ -1,45 +1,40 @@
-from utils.logger import get_logger
-
-logger = get_logger("ai_person_detector")
-
-try:
-    import tflite_runtime.interpreter as tflite  # or from tensorflow.lite ...
-except ImportError:
-    tflite = None
-    logger.warning("TFLite not available, person detection will be disabled.")
+import os
+import numpy as np
+from loguru import logger
+import tflite_runtime.interpreter as tflite
 
 
 class PersonDetector:
-    def __init__(self, model_path: str, enabled: bool = True):
-        self.enabled = enabled and tflite is not None
-        self.interpreter = None
-        if self.enabled:
-            self.interpreter = tflite.Interpreter(model_path=model_path)
-            self.interpreter.allocate_tensors()
-            self.input_details = self.interpreter.get_input_details()
-            self.output_details = self.interpreter.get_output_details()
-            logger.info("PersonDetector initialized.")
-        else:
-            logger.info("PersonDetector disabled or TFLite missing.")
+    def __init__(self, model_path="models/person_detection.tflite"):
+        if not os.path.exists(model_path):
+            logger.warning("[AI] Model file missing. Disabling AI features.")
+            self.interpreter = None
+            self.enabled = False
+            return
 
-    def is_person_present(self, frame) -> bool:
+        self.interpreter = tflite.Interpreter(model_path=model_path)
+        self.interpreter.allocate_tensors()
+        self.enabled = True
+
+        input_details = self.interpreter.get_input_details()
+        output_details = self.interpreter.get_output_details()
+        self.input_index = input_details[0]["index"]
+        self.output_index = output_details[0]["index"]
+        self.input_shape = input_details[0]["shape"]
+
+    def has_person(self, frame, threshold=0.6):
         if not self.enabled:
-            return True  # fallback: treat motion as valid
+            return False
 
-        # Minimal stub: resize and run model
-        import cv2
-        import numpy as np
+        h, w = self.input_shape[1], self.input_shape[2]
+        img = cv2.resize(frame, (w, h))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = np.expand_dims(img, axis=0).astype(np.uint8)
 
-        input_shape = self.input_details[0]["shape"]
-        h, w = input_shape[1], input_shape[2]
-        resized = cv2.resize(frame, (w, h))
-        input_data = resized.astype("float32") / 255.0
-        input_data = input_data.reshape(input_shape)
-
-        self.interpreter.set_tensor(self.input_details[0]["index"], input_data)
+        self.interpreter.set_tensor(self.input_index, img)
         self.interpreter.invoke()
-        output = self.interpreter.get_tensor(self.output_details[0]["index"])
+        output = self.interpreter.get_tensor(self.output_index)
 
-        score = float(output[0][0])  # model-dependent
-        logger.info(f"Person detection score: {score:.2f}")
-        return score > 0.5
+        # Assuming output is [1,1] with probability of person
+        prob = float(output.flatten()[0])
+        return prob >= threshold
