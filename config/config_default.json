@@ -3,8 +3,6 @@
   "pin_enabled": true,
   "pin_code": "1234",
 
-  "wifi_configurable": false,
-
   "email": {
     "enabled": false,
     "smtp_server": "",
