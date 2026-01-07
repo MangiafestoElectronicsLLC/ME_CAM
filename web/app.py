@@ -1,27 +1,26 @@
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, session, send_from_directory, jsonify
+    url_for, session, jsonify
 )
 from threading import Event
 from loguru import logger
 import os
 
 from config_manager import get_config, save_config, is_first_run, mark_first_run_complete
-from watchdog import CameraWatchdog  # your existing watchdog
+from watchdog import CameraWatchdog
 from camera_pipeline import CameraPipeline
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 watchdog = CameraWatchdog()
-watchdog.start()  # starts pipeline thread on boot
+watchdog.start()  # start pipeline thread on boot
 
 
 @app.before_request
 def ensure_first_run_redirect():
     if request.path.startswith("/static"):
         return
-    cfg = get_config()
     if is_first_run() and request.path not in ("/setup", "/setup/save"):
         return redirect(url_for("setup"))
 
@@ -38,32 +37,18 @@ def setup_save():
 
     cfg["device_name"] = request.form.get("device_name", cfg["device_name"])
 
-    # PIN
     pin_enabled = request.form.get("pin_enabled") == "on"
     pin_code = request.form.get("pin_code") or cfg["pin_code"]
     cfg["pin_enabled"] = pin_enabled
     cfg["pin_code"] = pin_code
 
-    # Email
-    cfg["email"]["enabled"] = request.form.get("email_enabled") == "on"
-    cfg["email"]["smtp_server"] = request.form.get("smtp_server", "")
-    cfg["email"]["smtp_port"] = int(request.form.get("smtp_port") or 587)
-    cfg["email"]["username"] = request.form.get("email_username", "")
-    cfg["email"]["password"] = request.form.get("email_password", "")
-    cfg["email"]["from_address"] = request.form.get("email_from", "")
-    cfg["email"]["to_address"] = request.form.get("email_to", "")
-
-    # Google Drive
-    cfg["google_drive"]["enabled"] = request.form.get("gdrive_enabled") == "on"
-    cfg["google_drive"]["folder_id"] = request.form.get("gdrive_folder_id", "")
-
-    # Storage
     cfg["storage"]["retention_days"] = int(request.form.get("retention_days") or 7)
     cfg["storage"]["motion_only"] = (request.form.get("motion_only") == "on")
 
-    # Detection
     cfg["detection"]["person_only"] = (request.form.get("person_only") == "on")
     cfg["detection"]["sensitivity"] = float(request.form.get("sensitivity") or 0.6)
+
+    # (Hooks for email/gdrive can be added here later)
 
     save_config(cfg)
     mark_first_run_complete()
@@ -101,6 +86,7 @@ def index():
         return redirect(url_for("login"))
 
     try:
+        # lightweight pipeline check for dashboard
         temp_pipeline = CameraPipeline(Event(), preview_only=True)
         status = watchdog.status()
         return render_template("dashboard.html", status=status)
@@ -108,7 +94,7 @@ def index():
         logger.warning(f"[DASHBOARD] Fallback triggered: {e}")
         return render_template(
             "fallback.html",
-            message="Camera pipeline unavailable. Check camera, model file, or config.",
+            message="Camera pipeline unavailable. Check camera, model file, or config."
         )
 
 
@@ -120,14 +106,30 @@ def api_status():
 @app.route("/api/trigger_emergency", methods=["POST"])
 def trigger_emergency():
     """
-    Hook to send latest motion clip to 'first responders'.
-    In practice: upload to GDrive, send email with link, hit webhook, etc.
+    Hook to send latest motion clip to 'first responders':
+    - future: upload to GDrive, email link, hit webhook, etc.
     """
     try:
         last_clip = watchdog.get_last_motion_clip()
-        # TODO: implement email/gdrive/webhook integration here
+        # TODO: actual email/gdrive/webhook integration
         logger.info(f"[EMERGENCY] Triggered for clip: {last_clip}")
         return jsonify({"ok": True, "clip": last_clip})
     except Exception as e:
         logger.error(f"[EMERGENCY] Failed: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# -------- Multi-camera dashboard (central node) --------
+
+@app.route("/multicam")
+def multicam():
+    """
+    This is for a separate 'hub' Pi or PC that monitors multiple ME_CAM nodes.
+    Devices are configured manually in a list for now.
+    """
+    devices = [
+        {"name": "Front Door", "url": "http://10.2.1.4:8080"},
+        {"name": "Back Door", "url": "http://10.2.1.5:8080"}
+        # etc., pulled from a config later
+    ]
+    return render_template("multicam.html", devices=devices)
