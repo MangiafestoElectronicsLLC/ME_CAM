@@ -1,0 +1,52 @@
+body {
+    background-color: #121212;
+    color: #eee;
+    font-family: Arial, sans-serif;
+    margin: 0;
+}
+
+.navbar {
+    background: #1f1f1f;
+    padding: 10px 20px;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.navbar .brand {
+    font-weight: bold;
+    margin-right: auto;
+}
+
+.navbar a {
+    color: #eee;
+    text-decoration: none;
+}
+
+.container {
+    padding: 20px;
+}
+
+button {
+    background: #2979ff;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    cursor: pointer;
+}
+
+button.danger {
+    background: #d32f2f;
+}
+
+.flash {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.flash li {
+    background: #333;
+    padding: 8px;
+    border-left: 4px solid #2979ff;
+}

@@ -1,0 +1,4 @@
+[
+  {"name": "Front Door", "url": "http://10.0.0.21:8080"},
+  {"name": "Back Door", "url": "http://10.0.0.22:8080"}
+]

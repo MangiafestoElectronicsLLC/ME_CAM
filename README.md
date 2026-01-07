@@ -1,39 +1,64 @@
-# 📷 ME Camera
 ### by MangiafestoElectronics LLC
 
-ME Camera is a plug-and-play Raspberry Pi security camera system featuring:
-- QR-based first-boot setup
-- HDMI splash screen for local configuration
-- Web dashboard with PIN protection
-- Motion detection and encrypted video storage
-- Email and optional Google Drive alerts
-- Offline-first design with auto recovery
+# 📸 ME Camera (ME_CAM)
+A secure, plug‑and‑play Raspberry Pi Zero 2 W smart camera system with:
+
+- Person‑only motion detection (AI‑powered)
+- Encrypted local storage with retention control
+- Email + Google Drive notifications
+- Emergency clip sending
+- First‑run setup wizard
+- Auto‑boot service
+- Multi‑camera dashboard (ME_CAM Hub)
+- Mobile‑friendly web UI
+- Optional WireGuard secure remote access
 
 ---
 
 ## 🚀 Features
-- Auto-creates config on first boot
-- QR code setup via browser
-- Flask-based web dashboard
-- Tkinter HDMI GUI
-- Motion-triggered recording
-- Encrypted video storage
-- Battery monitoring and alerts
-- Optional cloud uploads
+
+### 🎯 Smart Detection
+- Person‑only motion detection using TensorFlow Lite
+- Smart motion filtering (no false triggers from leaves, shadows, etc.)
+- Records only when a person is detected
+
+### 🔐 Security
+- PIN‑protected dashboard
+- Optional WireGuard secure remote access
+- Local encrypted storage (optional)
+
+### ☁️ Notifications
+- Email alerts with attached motion clips
+- Google Drive uploads
+- Emergency “Send to First Responders” button
+
+### 🧰 Reliability
+- Watchdog auto‑restarts camera pipeline
+- Automatic cleanup of old recordings
+- Systemd auto‑boot service
+
+### 🖥 Multi‑Camera Support
+- ME_CAM Hub dashboard for viewing multiple cameras
 
 ---
 
-## 🧰 Hardware
-- Raspberry Pi Zero 2 W / Pi 4 / Pi 5
+## 🧩 Hardware Requirements
+- Raspberry Pi Zero 2 W (recommended)
 - Pi Camera Module or USB camera
-- Optional battery pack + HDMI display
+- 16GB+ microSD card
+- Optional: battery pack, case, PoE splitter
 
 ---
 
-## ⚙️ Installation
+## 🧑‍💻 Software Requirements
+- Raspberry Pi OS **Legacy (Bullseye) Lite**
+- Python 3.9
+- OpenCV 4.5.1.48
+- TensorFlow Lite Runtime 2.7.0
 
-```bash
-git clone https://github.com/YOUR_USERNAME/ME_Camera.git
-cd ME_Camera
-pip3 install -r requirements.txt
-python3 main.py
+---
+
+## 🔧 Installation (Fresh SD Card)
+
+### 1. Flash Bullseye Lite
+Use Raspberry Pi Imager:

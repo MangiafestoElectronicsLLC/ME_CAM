@@ -1,0 +1,237 @@
+ME CAMERA – PI ZERO 2 W COMPLETE SETUP GUIDE
+============================================
+
+This guide walks from a blank SD card → fully running ME Camera with auto-boot.
+
+--------------------------------------------
+1. FLASH RASPBERRY PI OS (LEGACY) BULLSEYE
+--------------------------------------------
+Use Raspberry Pi Imager:
+
+Choose OS →
+  Raspberry Pi OS (Other) →
+    Raspberry Pi OS (Legacy) →
+      Raspberry Pi OS Lite (Legacy)
+
+Enable:
+- SSH
+- Wi-Fi
+- Username/password
+
+Flash SD card and boot Pi.
+
+--------------------------------------------
+2. CONNECT TO THE PI
+--------------------------------------------
+ssh pi@raspberrypi.local
+
+--------------------------------------------
+3. CLEAN ANY OLD INSTALLS
+--------------------------------------------
+sudo systemctl stop mecamera 2>/dev/null
+sudo systemctl disable mecamera 2>/dev/null
+sudo rm -f /etc/systemd/system/mecamera.service
+sudo systemctl daemon-reload
+
+rm -rf ~/ME_CAM
+rm -rf ~/.cache/pip
+sudo apt autoremove -y
+sudo apt clean
+
+--------------------------------------------
+4. CLONE THE ME_CAMERA REPOSITORY
+--------------------------------------------
+cd ~
+git clone -b DEV https://github.com/MangiafestoElectronicsLLC/ME_CAM.git
+cd ME_CAM
+
+--------------------------------------------
+5. RUN THE AUTOMATED INSTALLER
+--------------------------------------------
+chmod +x setup.sh
+./setup.sh
+
+This installs:
+- Python 3.9 venv
+- OpenCV
+- NumPy
+- TFLite
+- Email + Google Drive dependencies
+- Config folders
+
+--------------------------------------------
+6. RUN ME CAMERA MANUALLY (FIRST TIME)
+--------------------------------------------
+source venv/bin/activate
+python3 main.py
+
+Open in browser:
+http://raspberrypi.local:8080
+
+You will see the FIRST RUN SETUP WIZARD.
+
+--------------------------------------------
+7. ENABLE AUTO-BOOT
+--------------------------------------------
+sudo cp systemd/mecamera.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable mecamera
+sudo systemctl start mecamera
+
+--------------------------------------------
+8. EMERGENCY BUTTON
+--------------------------------------------
+Dashboard → “Send Last Clip to First Responders”
+
+This:
+- Uploads clip to Google Drive (if enabled)
+- Emails clip + link (if enabled)
+
+--------------------------------------------
+9. FACTORY RESET
+--------------------------------------------
+./factory_reset.sh
+
+This wipes:
+- config.json
+- recordings
+- exports
+
+--------------------------------------------
+10. SELF UPDATE
+--------------------------------------------
+./self_update.sh
+
+Pulls latest DEV branch, reinstalls dependencies, restarts service.
+
+--------------------------------------------
+11. READY FOR MAIN BRANCH
+--------------------------------------------
+Once tested:
+git checkout main
+git merge DEV
+git push origin main
+
+--------------------------------------------
+END OF NOTES
+--------------------------------------------
+
+1. First Boot Setup
+SSH into the Pi:
+
+bash
+ssh pi@<your-pi-ip> 
+or
+ssh pi@raspberrypi.local
+
+
+Update system:
+sudo apt update && sudo apt full-upgrade -y
+sudo reboot
+
+2. Install System Dependencies
+Your project uses OpenCV, TensorFlow Lite, Flask, and camera stack components.
+Install everything required:
+sudo apt install -y \
+    python3 python3-pip python3-venv \
+    libatlas-base-dev \
+    libjpeg-dev libtiff5-dev libjasper-dev libpng-dev \
+    libavcodec-dev libavformat-dev libswscale-dev \
+    libv4l-dev v4l-utils \
+    libgtk2.0-dev \
+    libopenblas-dev liblapack-dev \
+    git
+
+Clone the DEV Branch
+cd ~
+git clone -b DEV https://github.com/MangiafestoElectronicsLLC/ME_CAM.git
+cd ME_CAM
+
+
+4. Create Virtual Environment
+Your repo expects Python 3.9 (Bullseye ships with 3.9)
+
+python3 -m venv venv
+source venv/bin/activate
+
+
+5. Install Python Dependencies
+Your requirements.txt includes OpenCV, Flask, TFLite runtime, etc. Install them:
+
+pip install --upgrade pip
+pip install -r requirements.txt
+
+If TensorFlow Lite fails (common on Pi Zero), install the correct wheel:
+pip install https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.7.0-cp39-cp39-linux_armv7l.whl
+
+6. Run the Setup Script
+Your repo includes a setup.sh script for first‑run configuration.
+
+Make it executable:
+chmod +x setup.sh
+./setup.sh
+
+This script:
+
+Creates config directories
+
+Copies default config
+
+Prepares storage paths
+
+Sets permissions
+
+▶️ 7. Test the Camera Pipeline
+Run the main program manually:
+
+python3 main.py
+
+You should see logs from:
+
+camera_pipeline.py
+
+motion_detector.py
+
+ai_person_detector.py
+
+web_dashboard.py
+
+If the dashboard loads, visit:
+
+Code
+http://<pi-ip>:5000
+🔁 8. Install the Systemd Service
+Your repo includes a service file at:
+
+Code
+etc/systemd/system/mecamera.service
+
+Install it:
+
+bash
+sudo cp etc/systemd/system/mecamera.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable mecamera.service
+sudo systemctl start mecamera.service
+Check logs:
+
+bash
+sudo journalctl -u mecamera.service -f
+🔐 Optional: WireGuard Setup
+Your repo includes a full guide at:
+docs/wireguard_setup.md
+
+🎉 Deployment Complete
+At this point:
+
+The camera boots automatically
+
+The dashboard is available on port 5000
+
+Motion/person detection runs continuously
+
+Clips are stored + encrypted (if enabled)
+
+Notifications (email/GDrive) work once configured
+
+

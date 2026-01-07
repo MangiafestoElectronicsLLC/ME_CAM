@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ME Camera</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<nav class="navbar">
+    <span class="brand">ME Camera</span>
+    {% if session.get('logged_in') %}
+    <a href="{{ url_for('index') }}">Dashboard</a>
+    <a href="{{ url_for('config_page') }}">Config</a>
+    <a href="{{ url_for('logout') }}">Logout</a>
+    {% endif %}
+</nav>
+<div class="container">
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <ul class="flash">
+        {% for m in messages %}
+        <li>{{ m }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>

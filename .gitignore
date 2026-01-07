@@ -1,10 +1,27 @@
+# Python
+venv/
 __pycache__/
 *.pyc
-config.json
-.env
-.motion_videos/
-encrypted_videos/
+
+# Logs
+logs/
 *.log
-.vscode/
-.idea/
+
+# Configs containing secrets
+config/config.json
+config/gdrive_credentials.json
+config/*.pem
+config/*.key
+
+# Recordings
+recordings/
+exports/
+
+# Credentials
+*.env
+*.token
+*.secret
+
+# OS junk
 .DS_Store
+Thumbs.db

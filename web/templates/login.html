@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>Login</h1>
+<p>Enter your dashboard PIN. If this is the first time, this will set your new PIN.</p>
+<form method="post">
+    <label>PIN</label>
+    <input type="password" name="pin" required>
+    <button type="submit">Submit</button>
+</form>
+{% endblock %}

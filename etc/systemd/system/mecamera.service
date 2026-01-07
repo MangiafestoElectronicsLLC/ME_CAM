@@ -1,0 +1,12 @@
+[Unit]
+Description=ME Camera Service
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/ME_CAM
+ExecStart=/home/pi/ME_CAM/venv/bin/python3 /home/pi/ME_CAM/main.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
