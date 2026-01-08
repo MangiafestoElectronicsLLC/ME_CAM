@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>ME Camera - Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 60px auto;
+            background: #1a1a1a;
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+
+        .login-container h1 {
+            color: #2979ff;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .login-container p {
+            color: #999;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            background: #0f0f0f;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2979ff;
+            background: #1a1a1a;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #2979ff, #1565c0);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-login:hover {
+            background: linear-gradient(135deg, #1565c0, #0d47a1);
+        }
+
+        .error {
+            background: #3d2d2d;
+            border: 1px solid #d32f2f;
+            color: #ff6b6b;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #2d3d2d;
+            border: 1px solid #388e3c;
+            color: #81c784;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .signup-link {
+            text-align: center;
+            margin-top: 20px;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+            color: #999;
+        }
+
+        .signup-link a {
+            color: #2979ff;
+            text-decoration: none;
+        }
+
+        .signup-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="navbar">
+        <div class="brand">📹 ME Camera</div>
+    </div>
+
+    <div class="login-container">
+        <h1>🔐 Login</h1>
+        <p>Access your security camera dashboard</p>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if success %}
+        <div class="success">{{ success }}</div>
+        {% endif %}
+
+        <form method="post" action="/login">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required placeholder="Enter username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Enter password">
+            </div>
+
+            <button type="submit" class="btn-login">Login</button>
+        </form>
+
+        <div class="signup-link">
+            Don't have an account? <a href="/register">Create one</a>
+        </div>
+    </div>
+</body>
+
+</html>

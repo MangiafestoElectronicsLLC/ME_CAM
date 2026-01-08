@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>ME Camera - Register</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .register-container {
+            max-width: 400px;
+            margin: 40px auto;
+            background: #1a1a1a;
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+
+        .register-container h1 {
+            color: #2979ff;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .register-container p {
+            color: #999;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            background: #0f0f0f;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2979ff;
+            background: #1a1a1a;
+        }
+
+        .btn-register {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #2979ff, #1565c0);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-register:hover {
+            background: linear-gradient(135deg, #1565c0, #0d47a1);
+        }
+
+        .error {
+            background: #3d2d2d;
+            border: 1px solid #d32f2f;
+            color: #ff6b6b;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #2d3d2d;
+            border: 1px solid #388e3c;
+            color: #81c784;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+            color: #999;
+        }
+
+        .login-link a {
+            color: #2979ff;
+            text-decoration: none;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+
+        .help-text {
+            color: #666;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="navbar">
+        <div class="brand">📹 ME Camera</div>
+    </div>
+
+    <div class="register-container">
+        <h1>📝 Create Account</h1>
+        <p>Register a new dashboard account</p>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if success %}
+        <div class="success">{{ success }}</div>
+        {% endif %}
+
+        {% if not success %}
+        <form method="post" action="/register">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required placeholder="Choose a username">
+                <div class="help-text">At least 3 characters</div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Enter password">
+                <div class="help-text">At least 6 characters</div>
+            </div>
+
+            <div class="form-group">
+                <label for="password_confirm">Confirm Password</label>
+                <input type="password" id="password_confirm" name="password_confirm" required
+                    placeholder="Confirm password">
+            </div>
+
+            <button type="submit" class="btn-register">Create Account</button>
+        </form>
+        {% endif %}
+
+        <div class="login-link">
+            Already have an account? <a href="/login">Login</a>
+        </div>
+    </div>
+</body>
+
+</html>

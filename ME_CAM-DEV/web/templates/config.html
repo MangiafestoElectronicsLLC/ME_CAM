@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeHome Settings</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .settings-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .settings-section {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+
+        .settings-section h3 {
+            color: #2979ff;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #e0e0e0;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="password"],
+        .form-group input[type="number"],
+        .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            background: #0f0f0f;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group input[type="email"]:focus,
+        .form-group input[type="password"]:focus,
+        .form-group input[type="number"]:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #2979ff;
+            background: #1a1a1a;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
+            cursor: pointer;
+            accent-color: #2979ff;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+            color: #e0e0e0;
+        }
+
+        .nested-section {
+            margin-left: 30px;
+            padding: 15px;
+            background: #0f0f0f;
+            border-radius: 6px;
+            border-left: 3px solid #2979ff;
+            display: none;
+        }
+
+        .nested-section.active {
+            display: block;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #2979ff, #1565c0);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        .btn-save:hover {
+            background: linear-gradient(135deg, #1565c0, #0d47a1);
+        }
+
+        .help-text {
+            color: #888;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+            border-bottom: 2px solid #2979ff;
+            padding: 15px 0;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            margin: 0;
+            color: #2979ff;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>⚙️ Settings</h1>
+    </header>
+
+    <div class="settings-container">
+        <form method="POST" action="{{ url_for('settings') }}">
+
+            <!-- System Integration Section -->
+            <div class="settings-section">
+                <h3>🔧 System Integration</h3>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="wifi_enabled" name="wifi_enabled" {% if config.get('wifi_enabled')
+                        %}checked{% endif %}>
+                    <label for="wifi_enabled">WiFi Configuration</label>
+                </div>
+                <p class="help-text">Enable WiFi management interface</p>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="bluetooth_enabled" name="bluetooth_enabled" {% if
+                        config.get('bluetooth_enabled') %}checked{% endif %}>
+                    <label for="bluetooth_enabled">Bluetooth Support</label>
+                </div>
+                <p class="help-text">Enable Bluetooth pairing for remote control</p>
+            </div>
+
+            <!-- Email Notifications Section -->
+            <div class="settings-section">
+                <h3>📧 Email Notifications</h3>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="email_enabled" name="email_enabled" {% if config.get('email',
+                        {}).get('enabled') %}checked{% endif %}>
+                    <label for="email_enabled">Enable Email Alerts</label>
+                </div>
+                <p class="help-text">Send motion detection alerts via email</p>
+
+                <div class="nested-section" id="email_config">
+                    <div class="form-group">
+                        <label for="smtp_server">SMTP Server</label>
+                        <input type="text" id="smtp_server" name="smtp_server"
+                            value="{{ config.get('email', {}).get('smtp_server', '') }}" placeholder="smtp.gmail.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="smtp_port">SMTP Port</label>
+                        <input type="number" id="smtp_port" name="smtp_port"
+                            value="{{ config.get('email', {}).get('smtp_port', 587) }}" placeholder="587">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email_username">Email Username</label>
+                        <input type="text" id="email_username" name="email_username"
+                            value="{{ config.get('email', {}).get('username', '') }}"
+                            placeholder="your-email@gmail.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email_password">Email Password</label>
+                        <input type="password" id="email_password" name="email_password"
+                            value="{{ config.get('email', {}).get('password', '') }}"
+                            placeholder="app-password (not regular password)">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email_from">From Address</label>
+                        <input type="text" id="email_from" name="email_from"
+                            value="{{ config.get('email', {}).get('from_address', '') }}"
+                            placeholder="alerts@safehome.local">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email_to">Alert Recipient</label>
+                        <input type="text" id="email_to" name="email_to"
+                            value="{{ config.get('email', {}).get('to_address', '') }}"
+                            placeholder="your-email@example.com">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Google Drive Section -->
+            <div class="settings-section">
+                <h3>☁️ Google Drive Backup</h3>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="gdrive_enabled" name="gdrive_enabled" {% if config.get('google_drive',
+                        {}).get('enabled') %}checked{% endif %}>
+                    <label for="gdrive_enabled">Enable Google Drive Backup</label>
+                </div>
+                <p class="help-text">Automatically upload recordings to Google Drive</p>
+
+                <div class="nested-section" id="gdrive_config">
+                    <div class="form-group">
+                        <label for="gdrive_folder_id">Google Drive Folder ID</label>
+                        <input type="text" id="gdrive_folder_id" name="gdrive_folder_id"
+                            value="{{ config.get('google_drive', {}).get('folder_id', '') }}"
+                            placeholder="Get from gdrive.google.com">
+                        <p class="help-text">Create a folder in Drive, open it, and copy the ID from the URL</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn-save">💾 Save Settings</button>
+        </form>
+
+        <p style="text-align: center; color: #888; margin-top: 30px;">
+            <a href="{{ url_for('index') }}" style="color: #2979ff; text-decoration: none;">← Back to Dashboard</a>
+        </p>
+    </div>
+
+    <script>
+        // Toggle nested sections when checkboxes change
+        document.getElementById('email_enabled').addEventListener('change', function () {
+            document.getElementById('email_config').classList.toggle('active', this.checked);
+        });
+
+        document.getElementById('gdrive_enabled').addEventListener('change', function () {
+            document.getElementById('gdrive_config').classList.toggle('active', this.checked);
+        });
+
+        // Initialize visibility on page load
+        if (document.getElementById('email_enabled').checked) {
+            document.getElementById('email_config').classList.add('active');
+        }
+        if (document.getElementById('gdrive_enabled').checked) {
+            document.getElementById('gdrive_config').classList.add('active');
+        }
+    </script>
+</body>
+
+</html>

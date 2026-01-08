@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .profile-container {
+            max-width: 600px;
+            margin: 40px auto;
+        }
+
+        .profile-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .profile-card h2 {
+            color: #2979ff;
+            margin-top: 0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+        }
+
+        .profile-info {
+            margin: 15px 0;
+        }
+
+        .profile-info label {
+            color: #999;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .profile-info div {
+            color: #e0e0e0;
+            padding: 10px 0;
+        }
+
+        .btn {
+            background: #2979ff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 10px;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background: #1565c0;
+        }
+
+        .btn-danger {
+            background: #d32f2f;
+        }
+
+        .btn-danger:hover {
+            background: #b71c1c;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="navbar">
+        <div class="brand">👤 Profile</div>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/config">⚙️ Settings</a>
+        <a href="/logout">Logout</a>
+    </div>
+
+    <div class="profile-container">
+        <div class="profile-card">
+            <h2>👤 User Profile</h2>
+
+            <div class="profile-info">
+                <label>Username</label>
+                <div>{{ username }}</div>
+            </div>
+
+            <div class="profile-info">
+                <label>Account Created</label>
+                <div>{{ user_created if user_created else 'Recent' }}</div>
+            </div>
+
+            <div class="profile-info">
+                <label>Last Login</label>
+                <div>Just now</div>
+            </div>
+
+            <div style="border-top: 1px solid #333; padding-top: 20px; margin-top: 20px;">
+                <a href="/user/change-password" class="btn">🔑 Change Password</a>
+                <a href="/dashboard" class="btn" style="background: #666;">← Back to Dashboard</a>
+            </div>
+        </div>
+
+        <div class="profile-card" style="background: #3d2d2d; border-color: #d32f2f;">
+            <h2 style="color: #ff6b6b;">⚠️ Danger Zone</h2>
+
+            <p style="color: #999;">
+                These actions are irreversible. Please use with caution.
+            </p>
+
+            <button class="btn btn-danger"
+                onclick="if(confirm('Delete your account? This cannot be undone!')) { location.href='/user/delete'; }">🗑️
+                Delete Account</button>
+        </div>
+    </div>
+</body>
+
+</html>

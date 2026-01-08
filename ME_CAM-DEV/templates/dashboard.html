@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+<head>
+  <title>ME Camera Dashboard</title>
+</head>
+<body>
+  <h1>ME Camera - {{ status.device_name or "Camera" }}</h1>
+  <p>Status: {{ status.state }}</p>
+  <p>Last motion clip: {{ status.last_motion_clip or "None" }}</p>
+
+  <form method="post" action="/api/trigger_emergency">
+    <button type="submit">Send Last Motion Clip to First Responders</button>
+  </form>
+</body>
+</html>

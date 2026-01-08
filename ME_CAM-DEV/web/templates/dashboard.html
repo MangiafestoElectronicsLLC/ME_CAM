@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>ME Camera Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="navbar">
+        <div class="brand">📹 ME Camera</div>
+        <a href="/">Dashboard</a>
+        <a href="/config">⚙️ Settings</a>
+        <a href="/logout">Logout</a>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div>
+                <h1>Dashboard</h1>
+                <div class="device-info">Device: <strong>{{ device_name or 'ME_CAM' }}</strong></div>
+            </div>
+            <div>
+                {% if status.active %}
+                <span class="status-pill online">● ONLINE</span>
+                {% else %}
+                <span class="status-pill offline">● OFFLINE</span>
+                {% endif %}
+                <span class="status-pill" style="margin-left:10px;">🔋 {{ battery_percent }}%</span>
+            </div>
+        </div>
+
+        <!-- Status Cards Grid -->
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-card-label">System Status</div>
+                <div class="status-card-value">
+                    {% if status.active %}
+                    <span style="color: #81c784;">✓ Active</span>
+                    {% else %}
+                    <span style="color: #ef5350;">✗ Offline</span>
+                    {% endif %}
+                </div>
+                <div class="status-card-subtext">Pipeline running</div>
+            </div>
+
+            <div class="status-card">
+                <div class="status-card-label">Battery Level</div>
+                {% if battery_percent is not none %}
+                <div class="status-card-value">{{ battery_percent }}%</div>
+                <div class="battery-bar {% if battery_low %}low{% endif %}">
+                    <div class="battery-bar-fill" style="width: {{ battery_percent }}%"></div>
+                </div>
+                {% else %}
+                <div class="status-card-value">External Power{% if battery_low %} (Low Voltage) {% endif %}</div>
+                {% endif %}
+                <div class="status-card-subtext">
+                    {% if battery_low %}
+                    <span style="color: #ef5350;">⚠️ Low voltage detected</span>
+                    {% else %}
+                    {% if battery_external %}Powered{% else %}Battery{% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="status-card-label">Storage Used</div>
+                <div class="status-card-value">{{ storage_used or '0.2' }} GB</div>
+                <div class="battery-bar">
+                    <div class="battery-bar-fill"
+                        style="width: {{ (storage_used|float / 64 * 100)|int }}%; background: linear-gradient(90deg, #64b5f6, #2196f3);">
+                    </div>
+                </div>
+                <div class="status-card-subtext">Retention: 7 days</div>
+            </div>
+
+            <div class="status-card">
+                <div class="status-card-label">Recordings</div>
+                <div class="status-card-value">{{ video_count or '0' }}</div>
+                <div class="status-card-subtext">Recent motion clips</div>
+            </div>
+            <div class="status-card">
+                <div class="status-card-label">History (24h)</div>
+                <div class="status-card-value">{{ history_count or 0 }}</div>
+                <div class="status-card-subtext">New events</div>
+            </div>
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-section">
+            <h2>📷 Cameras</h2>
+            <div class="camera-grid">
+                <div class="camera-card">
+                    <div class="camera-feed active">
+                        <video id="liveStream" autoplay muted playsinline
+                            style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    </div>
+                    <div class="camera-info">
+                        <div class="camera-name">{{ device_name or 'Main Camera' }}</div>
+                        <div class="camera-timestamp">Live feed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Emergency Alert Section -->
+        <div class="alert-section">
+            <h3>🚨 Emergency Action</h3>
+            <p>Send the latest motion detection to first responders.</p>
+            <p style="font-size: 12px; color: #aaa;">
+                Emergency Contact: <strong>{{ emergency_phone or 'Not configured' }}</strong>
+            </p>
+            <form method="post" action="/api/trigger_emergency" style="display: inline;">
+                <button type="submit" class="btn-emergency" onclick="return confirm('Send emergency alert?')">
+                    SEND TO FIRST RESPONDERS
+                </button>
+            </form>
+        </div>
+
+        <!-- Video Library -->
+        <div class="video-library">
+            <h2>📹 Recent Recordings</h2>
+            {% if videos and videos|length > 0 %}
+            <div class="video-grid">
+                {% for video in videos %}
+                <div class="video-item">
+                    {% if video.thumb_url %}
+                    <img src="{{ video.thumb_url }}" alt="{{ video.name }}" class="video-thumbnail">
+                    {% else %}
+                    <div class="video-thumbnail no-thumb">{{ video.name[:30] }}</div>
+                    {% endif %}
+                    <div class="video-info">{{ video.date }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>No recordings yet. Motion detection will save clips here.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-links">
+            <a href="/config">⚙️ Configure</a>
+            <a href="/multicam">📡 Multi-cam</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
+
+    <script>
+        setInterval(() => {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => console.log('Status:', data))
+                .catch(e => console.error('Error:', e));
+        }, 10000);
+    </script>
+</body>
+
+</html>

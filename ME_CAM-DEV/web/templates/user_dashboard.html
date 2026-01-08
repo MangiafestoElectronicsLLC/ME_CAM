@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ username }} - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="navbar">
+        <div class="brand">📹 {{ device_name }}</div>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/config">⚙️ Settings</a>
+        <a href="/user/profile">👤 Profile</a>
+        <a href="/logout">Logout</a>
+    </div>
+
+    <div class="container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <div>
+                <h1>🏠 {{ username }}'s Security Hub</h1>
+                <div class="device-info">Device: {{ device_name }} | User: {{ username }}</div>
+            </div>
+            <div>
+                <span class="status-pill online">● ONLINE</span>
+                <span class="status-pill" style="background: #0d47a1; color: #64b5f6;">🔋 {{ battery_percent if
+                    battery_percent else 'External Power' }}</span>
+            </div>
+        </div>
+
+        <!-- Status Grid -->
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>SYSTEM STATUS</h3>
+                <div class="status-value">✓ Active</div>
+                <div class="status-detail">Pipeline running</div>
+            </div>
+
+            <div class="status-card">
+                <h3>BATTERY LEVEL</h3>
+                <div class="status-value">{{ battery_percent if battery_percent else 'External Power' }}</div>
+                <div class="status-bar">
+                    <div class="status-bar-fill" style="width: {{ battery_percent if battery_percent else 100 }}%">
+                    </div>
+                </div>
+                <div class="status-detail">
+                    {% if battery_low %}<span style="color: #d32f2f;">⚠️ Low voltage</span>{% else %}Battery{% endif %}
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3>STORAGE USED</h3>
+                <div class="status-value">{{ storage_used }} GB</div>
+                <div class="status-bar">
+                    <div class="status-bar-fill" style="width: {{ (storage_used / 100) * 100 }}%"></div>
+                </div>
+                <div class="status-detail">Retention: 7 days</div>
+            </div>
+
+            <div class="status-card">
+                <h3>RECORDINGS</h3>
+                <div class="status-value">{{ video_count }}</div>
+                <div class="status-detail">Recent motion clips</div>
+            </div>
+
+            <div class="status-card">
+                <h3>HISTORY (24H)</h3>
+                <div class="status-value">{{ history_count }}</div>
+                <div class="status-detail">New events</div>
+            </div>
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-section">
+            <h2>📹 Live Camera</h2>
+            <div class="camera-feed">
+                <img src="/api/stream" alt="Live camera feed" style="width: 100%; height: auto;">
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <h2>⚡ Quick Actions</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                <button
+                    style="padding: 15px; background: #d32f2f; color: white; border: none; border-radius: 6px; cursor: pointer;"
+                    onclick="triggerEmergency()">🚨 SOS Alert</button>
+                <button
+                    style="padding: 15px; background: #1976d2; color: white; border: none; border-radius: 6px; cursor: pointer;">📥
+                    Download Recordings</button>
+                <button
+                    style="padding: 15px; background: #388e3c; color: white; border: none; border-radius: 6px; cursor: pointer;">🔄
+                    Restart Camera</button>
+            </div>
+        </div>
+
+        <!-- Recent Recordings -->
+        <div class="video-library">
+            <h2>📹 Recent Recordings</h2>
+            {% if videos and videos|length > 0 %}
+            <div class="video-grid">
+                {% for video in videos %}
+                <div class="video-item">
+                    {% if video.thumb_url %}
+                    <img src="{{ video.thumb_url }}" alt="{{ video.name }}" class="video-thumbnail">
+                    {% else %}
+                    <div class="video-thumbnail no-thumb">{{ video.name[:30] }}</div>
+                    {% endif %}
+                    <div class="video-info">{{ video.date }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>No recordings yet. Motion detection will save clips here.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- User Settings Card -->
+        <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 20px; margin-top: 30px;">
+            <h3 style="color: #2979ff;">🔐 User Settings</h3>
+            <p style="color: #999;">Manage your account and security preferences</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <a href="/user/profile"
+                    style="background: #2979ff; color: white; padding: 10px; border-radius: 6px; text-align: center; text-decoration: none; display: block;">👤
+                    Edit Profile</a>
+                <a href="/user/change-password"
+                    style="background: #1976d2; color: white; padding: 10px; border-radius: 6px; text-align: center; text-decoration: none; display: block;">🔑
+                    Change Password</a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-links">
+            <a href="/config">⚙️ Configure</a>
+            <a href="/user/profile">👤 Profile</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
+
+    <script>
+        function triggerEmergency() {
+            if (confirm('Send emergency alert?')) {
+                fetch('/api/trigger_emergency', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(d => alert('Emergency alert sent!'))
+                    .catch(e => alert('Error: ' + e));
+            }
+        }
+
+        // Refresh status every 10 seconds
+        setInterval(() => {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.active) {
+                        document.querySelector('.status-pill').innerHTML = '● OFFLINE';
+                    }
+                })
+                .catch(e => console.error(e));
+        }, 10000);
+    </script>
+</body>
+
+</html>

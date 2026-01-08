@@ -1,0 +1,41 @@
+{
+  "device_name": "ME_CAM_1",
+  "pin_enabled": true,
+  "pin_code": "1234",
+  "emergency_phone": "+1-800-555-0123",
+  "wifi_enabled": false,
+  "bluetooth_enabled": false,
+  "email": {
+    "enabled": false,
+    "smtp_server": "",
+    "smtp_port": 587,
+    "username": "",
+    "password": "",
+    "from_address": "",
+    "to_address": ""
+  },
+  "google_drive": {
+    "enabled": false,
+    "credentials_file": "config/gdrive_credentials.json",
+    "folder_id": ""
+  },
+  "storage": {
+    "recordings_dir": "recordings",
+    "retention_days": 7,
+    "motion_only": true,
+    "encrypt": true,
+    "encrypted_dir": "recordings_encrypted"
+  },
+  "detection": {
+    "person_only": true,
+    "sensitivity": 0.6,
+    "min_motion_area": 500
+  },
+  "notifications": {
+    "email_on_motion": false,
+    "gdrive_on_motion": false,
+    "webhook_on_motion": false,
+    "webhook_url": ""
+  },
+  "first_run_completed": false
+}

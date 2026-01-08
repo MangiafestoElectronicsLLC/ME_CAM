@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<h2>Status</h2>
+<ul>
+    <li>Battery Enabled: {{ 'Yes' if battery.enabled else 'No' }}</li>
+    <li>Battery Percent: {{ battery.percent if battery.percent is not none else 'N/A' }}</li>
+    <li>Battery Low: {{ 'Yes' if battery.is_low else 'No' }}</li>
+    <li>Email Alerts: {{ 'Enabled' if alerts.email_enabled else 'Disabled' }}</li>
+    <li>Google Drive: {{ 'Enabled' if alerts.gdrive_enabled else 'Disabled' }}</li>
+</ul>
+
+<form method="post" action="{{ url_for('shutdown') }}">
+    <button type="submit" class="danger">Safe Shutdown</button>
+</form>
+{% endblock %}
