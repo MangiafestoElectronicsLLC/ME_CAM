@@ -1,124 +1,102 @@
-import os
+import threading
 import time
-import cv2
-from loguru import logger
-from datetime import datetime, timedelta
+from typing import Generator, Optional
 
-from config_manager import get_config
-from ai_person_detector import PersonDetector
+from utils.logger import get_logger
+from utils.config_manager import get_config
 from motion_detector import MotionDetector
-from smart_motion_filter import SmartMotionFilter
-from encryptor import encrypt_file
+from libcamera_streamer import LibcameraMJPEGStreamer
+
+logger = get_logger("camera_pipeline")
 
 
 class CameraPipeline:
-    def __init__(self, stop_event, preview_only=False):
-        self.stop_event = stop_event
-        self.preview_only = preview_only
+    """
+    High-level camera pipeline that wires together:
+    - Libcamera MJPEG streamer
+    - Motion detector
+    - Configuration (resolution, fps)
+    """
 
-        cfg = get_config()
-        self.storage_cfg = cfg["storage"]
-        self.det_cfg = cfg["detection"]
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._streamer: Optional[LibcameraMJPEGStreamer] = None
+        self._motion_detector = MotionDetector()
+        self._running = False
 
-        self.person_detector = PersonDetector("models/person_detection.tflite")
-        self.motion_detector = MotionDetector(
-            min_area=self.det_cfg.get("min_motion_area", 500)
-        )
-        self.smart_filter = SmartMotionFilter()
+        self._load_stream_config()
 
-        self.recordings_dir = self.storage_cfg["recordings_dir"]
-        self.encrypted_dir = self.storage_cfg.get("encrypted_dir", "recordings_encrypted")
-        self.encrypt_enabled = self.storage_cfg.get("encrypt", False)
-        os.makedirs(self.recordings_dir, exist_ok=True)
-        if self.encrypt_enabled:
-            os.makedirs(self.encrypted_dir, exist_ok=True)
+    def _load_stream_config(self):
+        config = get_config()
+        resolution = config.get("stream_resolution", "1536x864")
+        fps = int(config.get("stream_fps", 15))
 
-        self._last_motion_clip = None
+        try:
+            width_str, height_str = resolution.lower().split("x")
+            width = int(width_str)
+            height = int(height_str)
+        except Exception:
+            logger.warning("[PIPELINE] Invalid resolution in config, falling back to 1536x864")
+            width, height = 1536, 864
 
-        self.camera_index = 0
-        self.cap = cv2.VideoCapture(self.camera_index)
-        if not self.cap.isOpened():
-            logger.warning("[CAMERA] Could not open /dev/video0")
+        self._width = width
+        self._height = height
+        self._fps = fps
+        logger.info(f"[PIPELINE] Using resolution {width}x{height} at {fps} fps")
+
+    def _ensure_streamer(self):
+        if self._streamer is None:
+            self._streamer = LibcameraMJPEGStreamer(
+                width=self._width,
+                height=self._height,
+                fps=self._fps,
+            )
+            self._streamer.start()
+
+    def update_stream_settings(self):
+        """
+        Called when config is changed via /config in the web UI.
+        """
+        with self._lock:
+            self._load_stream_config()
+            if self._streamer:
+                logger.info("[PIPELINE] Restarting streamer with new resolution/fps")
+                self._streamer.restart(
+                    width=self._width,
+                    height=self._height,
+                    fps=self._fps,
+                )
 
     def run(self):
+        """
+        Optional background pipeline work (e.g., motion detection on frames).
+        You can expand this later if you want motion detection to run in the background.
+        """
         logger.info("[PIPELINE] Camera pipeline started.")
-        self._cleanup_old_recordings()
+        self._running = True
+        self._ensure_streamer()
 
-        fourcc = cv2.VideoWriter_fourcc(*"XVID")
-        out = None
-        recording = False
-        last_motion_time = None
-        motion_timeout = 5  # seconds after last detection to stop recording
+        # Example: background loop that could run motion detection, etc.
+        while self._running:
+            time.sleep(0.5)
 
-        while not self.stop_event.is_set():
-            ret, frame = self.cap.read()
-            if not ret:
-                time.sleep(0.2)
-                continue
+    def stop(self):
+        self._running = False
+        if self._streamer:
+            self._streamer.stop()
 
-            motion_mask = self.motion_detector.detect(frame)
-            motion_detected = self.smart_filter.is_motion_significant(motion_mask)
+    def mjpeg_frames(self) -> Generator[bytes, None, None]:
+        """
+        Frame generator used by Flask MJPEG endpoint.
+        """
+        self._ensure_streamer()
+        if not self._streamer:
+            logger.warning("[PIPELINE] Streamer not available, no frames will be produced.")
+            while True:
+                time.sleep(0.5)
+                yield b""
 
-            person_present = False
-            if self.det_cfg.get("person_only", True) and self.person_detector.enabled:
-                person_present = self.person_detector.has_person(
-                    frame, threshold=self.det_cfg.get("sensitivity", 0.6)
-                )
-            else:
-                person_present = motion_detected
-
-            event_trigger = motion_detected and person_present
-
-            if event_trigger and not recording and not self.preview_only:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                clip_path = os.path.join(self.recordings_dir, f"motion_{timestamp}.avi")
-                h, w = frame.shape[:2]
-                out = cv2.VideoWriter(clip_path, fourcc, 10.0, (w, h))
-                recording = True
-                last_motion_time = time.time()
-                self._last_motion_clip = clip_path
-                logger.info(f"[RECORD] Started motion recording: {clip_path}")
-
-            if recording and out is not None:
-                out.write(frame)
-                if event_trigger:
-                    last_motion_time = time.time()
-                elif time.time() - last_motion_time > motion_timeout:
-                    logger.info("[RECORD] Stopping motion recording.")
-                    out.release()
-                    out = None
-                    recording = False
-                    # Encrypt the clip if enabled, then remove plaintext
-                    if self.encrypt_enabled and self._last_motion_clip:
-                        try:
-                            enc_path = encrypt_file(self._last_motion_clip, self.encrypted_dir)
-                            os.remove(self._last_motion_clip)
-                            logger.info(f"[RECORD] Removed plaintext after encrypt: {self._last_motion_clip}")
-                            self._last_motion_clip = enc_path
-                        except Exception as e:
-                            logger.warning(f"[RECORD] Encryption failed: {e}")
-
-            if self.preview_only:
-                break
-
-        if self.cap:
-            self.cap.release()
-        if out:
-            out.release()
-        logger.info("[PIPELINE] Camera pipeline stopped.")
-
-    def _cleanup_old_recordings(self):
-        retention_days = self.storage_cfg.get("retention_days", 7)
-        cutoff = datetime.now() - timedelta(days=retention_days)
-        for fname in os.listdir(self.recordings_dir):
-            fpath = os.path.join(self.recordings_dir, fname)
-            try:
-                mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
-                if mtime < cutoff:
-                    os.remove(fpath)
-                    logger.info(f"[CLEANUP] Removed old recording: {fpath}")
-            except Exception as e:
-                logger.warning(f"[CLEANUP] Error removing {fpath}: {e}")
-
-    def get_last_motion_clip(self):
-        return self._last_motion_clip
+        for frame in self._streamer.frames():
+            # Optionally run motion detection here on the JPEG frame if needed
+            # self._motion_detector.process_frame(...)
+            yield frame
