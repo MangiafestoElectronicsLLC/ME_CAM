@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+  <title>ME Camera - First Run Setup</title>
+</head>
+<body>
+  <h1>First Time Setup</h1>
+
+  <form method="post" action="/setup/save">
+    <h2>Device</h2>
+    <label>Device Name:
+      <input type="text" name="device_name" value="{{ config.device_name }}">
+    </label>
+
+    <h2>PIN</h2>
+    <label>
+      <input type="checkbox" name="pin_enabled" {% if config.pin_enabled %}checked{% endif %}>
+      Enable PIN Protection
+    </label><br>
+    <label>PIN Code:
+      <input type="password" name="pin_code" value="{{ config.pin_code }}">
+    </label>
+
+    <h2>Storage</h2>
+    <label>Retention Days:
+      <input type="number" name="retention_days" value="{{ config.storage.retention_days }}">
+    </label><br>
+    <label>
+      <input type="checkbox" name="motion_only" {% if config.storage.motion_only %}checked{% endif %}>
+      Only record during motion
+    </label>
+
+    <h2>Detection</h2>
+    <label>
+      <input type="checkbox" name="person_only" {% if config.detection.person_only %}checked{% endif %}>
+      Only trigger when a person is detected
+    </label><br>
+    <label>Sensitivity:
+      <input type="number" step="0.1" min="0.1" max="0.9" name="sensitivity"
+             value="{{ config.detection.sensitivity }}">
+    </label>
+
+    <br><br>
+    <button type="submit">Save & Continue</button>
+  </form>
+</body>
+</html>

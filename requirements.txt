@@ -1,9 +1,28 @@
-flask
-pillow
-qrcode[pil]
-cryptography==38.0.4
-yagmail
-pydrive2
-psutil
-opencv-python-headless==4.5.1.48
+# Core
+Flask==2.2.5
+Werkzeug==2.2.3
+
+# Camera + Image Processing
 numpy==1.19.5
+opencv-python-headless==4.5.1.48
+Pillow==9.5.0
+
+# Encryption
+cryptography==39.0.0
+
+# QR Codes
+qrcode[pil]==7.4.2
+
+# System utilities
+psutil==5.9.5
+
+# Email + Cloud
+yagmail==0.15.293
+pydrive2==1.19.0
+
+# Optional AI (TFLite)
+tflite-runtime==2.7.0
+
+
+# Logging helpers
+loguru==0.7.2

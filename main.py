@@ -1,17 +1,9 @@
-from config_manager import load_config
-import subprocess, os
+from loguru import logger
+from web.app import app
+import os
 
-config = load_config()
+os.makedirs("logs", exist_ok=True)
 
-# Launch setup mode if unconfigured
-if config["wifi_ssid"] == "":
-    subprocess.Popen(["python3", "setup_mode/setup_server.py"])
-    subprocess.Popen(["python3", "setup_mode/qr_display.py"])
-    exit()
-
-# Normal operation
-os.makedirs("motion_videos", exist_ok=True)
-os.makedirs("encrypted_videos", exist_ok=True)
-
-subprocess.Popen(["python3", "web_dashboard.py"])
-subprocess.Popen(["python3", "motion_detector.py"])
+if __name__ == "__main__":
+    logger.add("logs/mecam.log", rotation="10 MB", retention="14 days", backtrace=True, diagnose=True)
+    app.run(host="0.0.0.0", port=8080, debug=False)

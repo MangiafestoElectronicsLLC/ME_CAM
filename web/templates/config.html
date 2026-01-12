@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>Configuration</h1>
+
+<h2>Motion</h2>
+<form method="post">
+    <label>Sensitivity (0-1)</label>
+    <input type="number" name="sensitivity" step="0.05" min="0" max="1"
+           value="{{ config.motion.sensitivity }}">
+    <button type="submit">Save</button>
+</form>
+
+<h2>Config Export / Import</h2>
+<p>Export current configuration:</p>
+<a href="{{ url_for('config_export') }}">Download Config</a>
+
+<p>Import configuration:</p>
+<form method="post" action="{{ url_for('config_import') }}" enctype="multipart/form-data">
+    <input type="file" name="file" accept="application/json" required>
+    <button type="submit">Upload</button>
+</form>
+{% endblock %}
