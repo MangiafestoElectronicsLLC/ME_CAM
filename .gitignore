@@ -1,10 +1,154 @@
-__pycache__/
+# ME Camera Project - Git Ignore Configuration v2.1
+# Last Updated: January 15, 2026
+
+################################################################################
+# Python & Virtual Environment
+################################################################################
+venv/
+env/
+ENV/
+.venv/
 *.pyc
-config.json
-.env
-.motion_videos/
-encrypted_videos/
-*.log
+__pycache__/
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+
+################################################################################
+# IDE & Editor Files
+################################################################################
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 .DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+################################################################################
+# Runtime Artifacts
+################################################################################
+logs/
+*.log
+*.log.*
+.pid
+
+################################################################################
+# Configuration & Secrets (LOCAL ONLY - Never commit)
+################################################################################
+config/config.json
+config/users.db
+config/*.db
+.env
+.env.local
+secrets.txt
+.env*.local
+
+################################################################################
+# Camera & Recording Files (Too large for Git)
+################################################################################
+recordings/
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.flv
+thumbs/
+*.jpg
+*.jpeg
+*.png
+
+################################################################################
+# Temporary & Cache Files
+################################################################################
+.cache/
+*.cache
+*.tmp
+*.temp
+
+################################################################################
+# SSL/TLS Certificates (Local only)
+################################################################################
+certs/*.key
+certs/*.pem
+certs/*.csr
+!certs/.gitkeep
+
+################################################################################
+# Backups
+################################################################################
+*.backup
+*.bak
+~*
+*~
+
+################################################################################
+# OS-Specific Files
+################################################################################
+.DS_Store
+Thumbs.db
+.directory
+.LSOverride
+.AppleDouble
+.AppleDB
+.TemporaryItems
+.Spotlight-V100
+.com.apple.timemachine.donotpresent
+desktop.ini
+
+################################################################################
+# Node/npm (if using web tools in future)
+################################################################################
+node_modules/
+npm-debug.log
+yarn-error.log
+
+################################################################################
+# Docker
+################################################################################
+.dockerignore
+docker-compose.override.yml
+
+################################################################################
+# CI/CD & Secrets
+################################################################################
+.github/workflows/*secrets*
+.gitlab-ci.local.yml
+
+################################################################################
+# IDE Python Cache
+################################################################################
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+*.env
+*.token
+*.secret
+
+# Deployment scripts (local only)
+deploy_*.ps1
+deploy_*.sh
+*_deployment_*.txt
+*_notes.txt
+pi_deployment_*.txt
+
+# Temporary documentation (consolidated in official docs)
+QUICK_*.txt
+QUICK_*.md
+*_SUMMARY.md
+*_IMPROVEMENTS.md
+*_GUIDE.md
+
+# OS junk
+.DS_Store
+Thumbs.db
+PRIVATE_SETUP_NOTES.md

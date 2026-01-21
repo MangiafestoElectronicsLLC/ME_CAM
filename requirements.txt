@@ -1,9 +1,64 @@
-flask
-pillow
-qrcode[pil]
-cryptography==38.0.4
-yagmail
-pydrive2
-psutil
-opencv-python-headless==4.5.1.48
+# Core
+Flask==2.2.5
+Werkzeug==2.2.3
+
+# Camera + Image Processing
 numpy==1.19.5
+opencv-python-headless==4.5.1.48
+Pillow==9.5.0
+
+# Encryption
+cryptography==39.0.0
+
+# QR Codes
+qrcode[pil]==7.4.2
+
+# System utilities
+psutil==5.9.5
+
+# Email + Cloud
+yagmail==0.15.293
+pydrive2==1.19.0
+
+# Optional AI (TFLite)
+tflite-runtime==2.7.0
+
+
+# Logging helpers
+loguru==0.7.2
+# =========================================================================
+# ME_CAM Python Requirements
+# =========================================================================
+# For Pi Zero 2W: Install numpy and Pillow via apt first (see INSTALL.md):
+#   sudo apt install -y python3-numpy python3-pil
+# Then install these requirements with pip.
+# =========================================================================
+
+# Core
+Flask==3.0.0
+Werkzeug==3.0.0
+
+# Camera + Image Processing
+# NOTE: On Pi Zero 2W, numpy and Pillow should be installed via apt
+# to avoid long compilation times. See INSTALL.md for details.
+# numpy==2.0.0  # Use system package: sudo apt install python3-numpy
+# Pillow==10.0.0  # Use system package: sudo apt install python3-pil
+
+# Encryption
+cryptography==41.0.0
+
+# QR Codes
+qrcode[pil]==7.4.2
+
+# System utilities
+psutil==5.9.5
+
+# Email + Cloud
+yagmail==0.15.293
+pydrive2==1.19.0
+
+# Logging helpers
+loguru==0.7.2
+
+# Note: opencv-python-headless and tflite-runtime require specific builds
+# Install manually if needed
