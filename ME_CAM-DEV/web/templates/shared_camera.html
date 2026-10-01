@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ME_CAM | Shared camera</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #f1f4f0;
+            --muted: #a1aaa4;
+            --bg: #121715;
+            --panel: #1b2220;
+            --line: #343e39;
+            --green: #9fdf72;
+            --blue: #82c7df
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font: 15px/1.45 "Segoe UI", sans-serif
+        }
+
+        header {
+            padding: 16px 4vw;
+            border-bottom: 1px solid var(--line)
+        }
+
+        .brand {
+            font-weight: 700
+        }
+
+        .brand b {
+            color: var(--green)
+        }
+
+        main {
+            width: min(1000px, 94vw);
+            margin: 28px auto
+        }
+
+        h1 {
+            font-size: 25px
+        }
+
+        .feed {
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: contain;
+            background: #080b0a;
+            border: 1px solid var(--line)
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+
+        .events {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 10px;
+            margin-top: 18px
+        }
+
+        .event {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            padding: 12px;
+            border-radius: 4px
+        }
+
+        a {
+            color: var(--blue)
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="brand"><b>ME</b>_CAM · Shared view</div>
+    </header>
+    <main>
+        <h1>{{ share.camera_name }}</h1>
+        <p class="muted">Temporary access expires {{ expires_at.strftime('%Y-%m-%d %H:%M UTC') }}.</p><img class="feed"
+            src="{{ url_for('shared_stream', token=token) }}" alt="Live camera stream">
+        <h2>Latest motion events</h2>
+        <div class="events">{% for event in events %}<article class="event"><strong>{{ event.created_at }}</strong>
+                <div class="muted">{{ event.duration_seconds or '—' }} sec{% if event.has_audio %} · audio{% endif %}
+                </div>{% if event.has_clip %}<p><a
+                        href="{{ url_for('shared_event_clip', token=token, event_id=event.id) }}">View</a> · <a
+                        href="{{ url_for('shared_event_clip', token=token, event_id=event.id, download=1) }}">Download</a>
+                </p>{% endif %}
+            </article>{% else %}<p class="muted">No saved events.</p>{% endfor %}</div>
+    </main>
+</body>
+
+</html>

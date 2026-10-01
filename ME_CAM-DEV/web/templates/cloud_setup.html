@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ME_CAM | {{ 'Sign in' if login else 'Initial setup' }}</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #f1f4f0;
+            --muted: #a1aaa4;
+            --bg: #121715;
+            --line: #343e39;
+            --green: #9fdf72;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: var(--bg);
+            color: var(--ink);
+            font: 15px/1.45 "Segoe UI", sans-serif;
+        }
+
+        main {
+            width: min(420px, 92vw);
+            border-top: 3px solid var(--green);
+            padding: 24px 0;
+        }
+
+        h1 {
+            font-size: 25px;
+            margin: 0 0 6px;
+        }
+
+        p {
+            color: var(--muted);
+            margin: 0 0 22px;
+        }
+
+        label {
+            display: block;
+            margin: 14px 0 6px;
+        }
+
+        input {
+            width: 100%;
+            padding: 11px;
+            color: var(--ink);
+            background: #0d1210;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            font: inherit;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 18px;
+            padding: 11px;
+            border: 1px solid var(--green);
+            border-radius: 4px;
+            background: var(--green);
+            color: #14200e;
+            font: 700 15px "Segoe UI", sans-serif;
+            cursor: pointer;
+        }
+
+        .error {
+            color: #ff9689;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>ME_CAM</h1>
+        <p>{{ 'Sign in to your camera dashboard.' if login else 'Create the dashboard owner account.' }}</p>
+        <form method="post">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            {% if not login %}<label for="username">Username</label><input id="username" name="username" minlength="3"
+                required autocomplete="username">{% else %}<label for="username">Username</label><input id="username"
+                name="username" required autocomplete="username">{% endif %}
+            {% if not login %}<label for="setup_key">Setup key</label><input id="setup_key" name="setup_key"
+                type="password" autocomplete="off">{% endif %}
+            <label for="password">{{ 'Password' if login else 'Password (12 characters minimum)' }}</label>
+            <input id="password" name="password" type="password" minlength="{{ 1 if login else 12 }}" required
+                autocomplete="{{ 'current-password' if login else 'new-password' }}">
+            <button type="submit">{{ 'Sign in' if login else 'Create owner account' }}</button>
+        </form>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    </main>
+</body>
+
+</html>

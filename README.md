@@ -191,6 +191,7 @@ Create or rotate credentials before exposing the dashboard to any shared network
 ### Quick Reference
 - **[docs/GITHUB_INSTALL.md](docs/GITHUB_INSTALL.md)** - Step-by-step GitHub deployment guide
 - **[docs/REPLIT_INSTALL.md](docs/REPLIT_INSTALL.md)** - Step-by-step Replit dashboard and enrollment guide
+- **[ME_CAM-DEV/CLOUD_DEPLOYMENT.md](ME_CAM-DEV/CLOUD_DEPLOYMENT.md)** - Cloud dashboard deployment, HTTPS domain, enrollment, and persistent storage
 - **[SECURITY.md](SECURITY.md)** - Security controls, disclosure policy, and deployment guidance
 
 ### Technical Documentation

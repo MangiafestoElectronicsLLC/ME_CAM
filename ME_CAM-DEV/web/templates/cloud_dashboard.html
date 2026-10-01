@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ME_CAM | Security</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #f1f4f0;
+            --muted: #a1aaa4;
+            --bg: #121715;
+            --panel: #1b2220;
+            --line: #343e39;
+            --green: #9fdf72;
+            --red: #ff8276;
+            --blue: #82c7df;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font: 15px/1.45 "Segoe UI", sans-serif;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 14px clamp(16px, 4vw, 48px);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .brand {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .brand span {
+            color: var(--green);
+        }
+
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px;
+        }
+
+        nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav a[aria-current="page"] {
+            color: var(--green);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            border: 1px solid var(--line);
+            color: var(--ink);
+            background: #28312d;
+            padding: 9px 13px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            border-color: var(--green);
+        }
+
+        .wrap {
+            width: min(1180px, 94vw);
+            margin: 28px auto 56px;
+        }
+
+        .topline {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        h1 {
+            font-size: 26px;
+            margin: 0;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin: 0 0 14px;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .section {
+            border-top: 1px solid var(--line);
+            padding: 22px 0;
+        }
+
+        .add-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        input {
+            background: #0d1210;
+            color: var(--ink);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 9px 10px;
+            min-width: min(270px, 75vw);
+        }
+
+        .add-form button,
+        .armed button {
+            background: var(--green);
+            color: #14200e;
+            border-color: var(--green);
+            font-weight: 700;
+        }
+
+        .code {
+            margin-top: 14px;
+            padding: 12px;
+            border-left: 3px solid var(--green);
+            background: #202a24;
+            overflow-wrap: anywhere;
+        }
+
+        .camera {
+            display: grid;
+            grid-template-columns: minmax(0, 1.7fr) minmax(230px, .8fr);
+            gap: 18px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .feed {
+            display: block;
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: contain;
+            background: #080b0a;
+            border: 1px solid var(--line);
+        }
+
+        .camera-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .audio-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .camera-name {
+            font-size: 18px;
+            font-weight: 650;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        .dot.online {
+            background: var(--green);
+        }
+
+        .armed {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 12px 0;
+            border-top: 1px solid var(--line);
+        }
+
+        .armed.off button {
+            background: #442723;
+            border-color: #8c4c42;
+            color: #ffd9d3;
+        }
+
+        .events {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px;
+        }
+
+        .event {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            padding: 13px;
+            min-width: 0;
+        }
+
+        .event a {
+            color: var(--blue);
+        }
+
+        .event-title {
+            font-weight: 650;
+            margin-bottom: 4px;
+        }
+
+        .empty {
+            padding: 20px 0;
+            color: var(--muted);
+        }
+
+        .metric {
+            border-top: 1px solid var(--line);
+            padding-top: 9px;
+        }
+
+        .share-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        @media (max-width:720px) {
+            .camera {
+                grid-template-columns: 1fr;
+            }
+
+            .topline {
+                align-items: start;
+                flex-direction: column;
+            }
+
+            header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="brand"><span>ME</span>_CAM</div>
+        <nav aria-label="Main navigation">
+            <a href="/dashboard" aria-current="page">Dashboard</a>
+            <a href="/dashboard#devices">Devices</a>
+            <a href="/events">Events</a>
+            <a href="/config">Config</a>
+            <a href="/account">Account</a>
+            <form method="post" action="/logout"><input type="hidden" name="_csrf_token"
+                    value="{{ csrf_token }}"><button type="submit">Sign out</button></form>
+        </nav>
+    </header>
+    <main class="wrap">
+        <div class="topline">
+            <div>
+                <h1>Security cameras</h1>
+                <div class="muted">Signed in as {{ username }}</div>
+            </div>
+        </div>
+        <section class="section">
+            <h2>Add a camera</h2>
+            <form class="add-form" method="post" action="/cameras">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input name="name" maxlength="80" placeholder="Camera name" required>
+                <button type="submit">Create enrollment code</button>
+            </form>
+            {% if activation_code %}<div class="code"><strong>One-time enrollment
+                    code</strong><br><code>{{ activation_code }}</code>
+                <div class="muted">Enter this code during Pi installation. It expires in 48 hours.</div>
+            </div>{% endif %}
+            {% if share_url %}<div class="code"><strong>Temporary view link</strong><br><a href="{{ share_url }}">{{
+                    share_url }}</a>
+                <div class="muted">This link grants read-only live and event access until it expires or is revoked.
+                </div>
+            </div>{% endif %}
+        </section>
+        <section class="section" id="devices">
+            <h2>Devices</h2>
+            {% for camera in devices %}
+            {% set status = status_by_device.get(camera.id, {}) %}
+            <article class="camera">
+                <img class="feed" src="{{ url_for('cloud_stream', camera_id=camera.id) }}" alt="Live camera stream">
+                <div class="camera-meta">
+                    <div class="camera-name">{{ camera.name }}</div>
+                    <div class="status"><span
+                            class="dot {% if online_by_device.get(camera.id) %}online{% endif %}"></span><span>{% if
+                            online_by_device.get(camera.id) %}Online · {{ camera.last_seen }}{% else %}Offline · {{
+                            camera.last_seen or 'Waiting for device' }}{% endif %}</span></div>
+                    <div class="muted">{{ camera.device_id }}{% if status.get('camera_backend') %} · {{
+                        status.get('camera_backend') }}{% endif %}{% if status.get('resolution') %} · {{
+                        status.get('resolution') }}{% endif %}</div>
+                    <div class="metric">Power: {{ status.get('power_source_type') or 'Unknown' }}{% if
+                        status.get('battery_percent') is not none %} · {{ status.get('battery_percent') }}%{% else %} ·
+                        charge level unavailable{% endif %}{% if status.get('undervoltage') %} ·
+                        <strong>undervoltage</strong>{% endif %}</div>
+                    <div class="metric">SD storage: {% if status.get('storage_used_bytes') is not none and
+                        status.get('storage_total_bytes') %}{{ (status.get('storage_used_bytes') / 1073741824)|round(1)
+                        }} / {{ (status.get('storage_total_bytes') / 1073741824)|round(1) }} GB{% else %}Awaiting device
+                        report{% endif %}</div>
+                    <div class="audio-controls">
+                        <button type="button" data-listen-button="{{ camera.id }}"
+                            onclick="toggleListen({{ camera.id }})">Listen</button>
+                        <button type="button" data-talk-button="{{ camera.id }}"
+                            onclick="toggleTalk({{ camera.id }})">Talk</button>
+                    </div>
+                    <div class="muted" data-audio-status="{{ camera.id }}" aria-live="polite"></div>
+                    <form class="armed {% if camera.camera_mode != 'security' %}off{% endif %}" method="post"
+                        action="{{ url_for('set_camera_mode', camera_id=camera.id) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="mode"
+                            value="{{ 'standby' if camera.camera_mode == 'security' else 'security' }}">
+                        <span>{{ 'ARMED' if camera.camera_mode == 'security' else 'UNARMED' }}</span>
+                        <button type="submit">{{ 'Disarm' if camera.camera_mode == 'security' else 'Arm' }}</button>
+                    </form>
+                    <form class="share-form" method="post"
+                        action="{{ url_for('create_camera_share', camera_id=camera.id) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                        <label for="share-hours-{{ camera.id }}">Temporary view</label>
+                        <select id="share-hours-{{ camera.id }}" name="hours">
+                            <option value="1">1 hour</option>
+                            <option value="24" selected>24 hours</option>
+                            <option value="72">3 days</option>
+                            <option value="168">7 days</option>
+                        </select>
+                        <button type="submit">Create link</button>
+                    </form>
+                    <form method="post" action="{{ url_for('revoke_camera_shares', camera_id=camera.id) }}"><input
+                            type="hidden" name="_csrf_token" value="{{ csrf_token }}"><button type="submit">Revoke all
+                            links</button></form>
+                </div>
+            </article>
+            {% else %}<div class="empty">No cameras enrolled.</div>{% endfor %}
+        </section>
+        <section class="section">
+            <h2>Latest motion events</h2>
+            <div class="events">
+                {% for event in events %}
+                <article class="event">
+                    <div class="event-title">{{ event.camera_name }} · {{ event.type|title }}</div>
+                    <div class="muted">{{ event.created_at }}{% if event.duration_seconds %} · {{ event.duration_seconds
+                        }} sec{% endif %}{% if event.has_audio %} · audio{% endif %}</div>
+                    {% if event.has_clip %}<div><a href="{{ url_for('event_clip', event_id=event.id) }}">Open
+                            recording</a> · <a
+                            href="{{ url_for('event_clip', event_id=event.id, download=1) }}">Download</a></div>{% endif
+                    %}
+                </article>
+                {% else %}<div class="empty">Motion events will appear here when a camera uploads a recording.</div>{%
+                endfor %}
+            </div>
+            <p><a href="/events">Open event history</a></p>
+        </section>
+    </main>
+    <script>
+        const csrfToken = {{ csrf_token| tojson }};
+        const listenSessions = new Map();
+        const talkSessions = new Map();
+
+        function audioStatus(id, text) {
+            const node = document.querySelector(`[data-audio-status="${id}"]`);
+            if (node) node.textContent = text;
+        }
+
+        async function toggleListen(id) {
+            const button = document.querySelector(`[data-listen-button="${id}"]`);
+            if (listenSessions.has(id)) {
+                const state = listenSessions.get(id);
+                clearTimeout(state.timer);
+                state.context.close();
+                listenSessions.delete(id);
+                await fetch(`/camera/${id}/listen`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'enabled=0' });
+                button.textContent = 'Listen';
+                audioStatus(id, 'Listen stopped');
+                return;
+            }
+            const context = new AudioContext();
+            await context.resume();
+            const state = { context, sequence: 0, timer: null };
+            listenSessions.set(id, state);
+            const response = await fetch(`/camera/${id}/listen`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'enabled=1' });
+            if (!response.ok) {
+                listenSessions.delete(id);
+                context.close();
+                audioStatus(id, 'Listen could not start');
+                return;
+            }
+            button.textContent = 'Stop listening';
+            audioStatus(id, 'Connecting to microphone');
+            const poll = async () => {
+                if (!listenSessions.has(id)) return;
+                try {
+                    const result = await fetch(`/api/cameras/${id}/listen-audio?after=${state.sequence}`).then(r => r.json());
+                    for (const chunk of result.chunks || []) {
+                        const raw = Uint8Array.from(atob(chunk.pcm_b64), c => c.charCodeAt(0));
+                        const view = new DataView(raw.buffer);
+                        const samples = new Float32Array(Math.floor(raw.byteLength / 2));
+                        for (let i = 0; i < samples.length; i++) samples[i] = view.getInt16(i * 2, true) / 32768;
+                        const buffer = state.context.createBuffer(1, samples.length, chunk.sample_rate || 16000);
+                        buffer.copyToChannel(samples, 0);
+                        const source = state.context.createBufferSource();
+                        source.buffer = buffer;
+                        source.connect(state.context.destination);
+                        source.start();
+                        state.sequence = chunk.sequence;
+                    }
+                    if (result.chunks && result.chunks.length) audioStatus(id, 'Listening');
+                } catch (_error) {
+                    audioStatus(id, 'Listen connection interrupted');
+                }
+                state.timer = setTimeout(poll, 220);
+            };
+            poll();
+        }
+
+        async function toggleTalk(id) {
+            const button = document.querySelector(`[data-talk-button="${id}"]`);
+            if (talkSessions.has(id)) {
+                talkSessions.get(id).recorder.stop();
+                button.textContent = 'Talk';
+                return;
+            }
+            if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+                audioStatus(id, 'Microphone recording is not supported by this browser');
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const options = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? { mimeType: 'audio/webm;codecs=opus' } : {};
+                const recorder = new MediaRecorder(stream, options);
+                const chunks = [];
+                recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+                recorder.onstop = async () => {
+                    stream.getTracks().forEach(track => track.stop());
+                    talkSessions.delete(id);
+                    const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+                    try {
+                        const response = await fetch(`/api/cameras/${id}/speak`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken, 'Content-Type': blob.type }, body: blob });
+                        audioStatus(id, response.ok ? 'Talk audio queued' : 'Talk audio could not be queued');
+                    } catch (_error) {
+                        audioStatus(id, 'Talk connection failed');
+                    }
+                };
+                talkSessions.set(id, { recorder });
+                recorder.start();
+                button.textContent = 'Send talk audio';
+                audioStatus(id, 'Recording from browser microphone');
+            } catch (_error) {
+                audioStatus(id, 'Microphone access was not granted');
+            }
+        }
+    </script>
+</body>
+
+</html>

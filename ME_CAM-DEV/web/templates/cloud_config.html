@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ME_CAM | Config</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #f1f4f0;
+            --muted: #a1aaa4;
+            --bg: #121715;
+            --panel: #1b2220;
+            --line: #343e39;
+            --green: #9fdf72;
+            --blue: #82c7df
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font: 15px/1.45 "Segoe UI", sans-serif
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 14px clamp(16px, 4vw, 48px);
+            border-bottom: 1px solid var(--line)
+        }
+
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px
+        }
+
+        a {
+            color: var(--blue)
+        }
+
+        nav a {
+            color: var(--muted);
+            text-decoration: none
+        }
+
+        .brand {
+            font-weight: 700
+        }
+
+        .brand b {
+            color: var(--green)
+        }
+
+        main {
+            width: min(850px, 94vw);
+            margin: 32px auto
+        }
+
+        .device {
+            border-top: 1px solid var(--line);
+            padding: 18px 0
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+
+        label {
+            display: block;
+            margin: 12px 0 5px
+        }
+
+        input,
+        select {
+            width: min(100%, 520px);
+            padding: 10px;
+            background: #0d1210;
+            color: var(--ink);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            font: inherit
+        }
+
+        button {
+            padding: 10px 14px;
+            background: var(--green);
+            border: 0;
+            border-radius: 4px;
+            color: #14200e;
+            font-weight: 700;
+            margin-top: 14px
+        }
+
+        .notice {
+            color: var(--green)
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="brand"><b>ME</b>_CAM</div>
+        <nav><a href="/dashboard">Dashboard</a><a href="/dashboard#devices">Devices</a><a href="/events">Events</a><a
+                href="/config">Config</a><a href="/account">Account</a></nav>
+    </header>
+    <main>
+        <h1>Camera configuration</h1>
+        <p class="muted">Send Wi-Fi credentials to a camera. They are encrypted in local storage and delivered when that
+            camera next polls.</p>{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+        {% for device in devices %}{% set status = device_status.get(device.id,{}) %}<section class="device">
+            <h2>{{ device.name }}</h2>
+            <p class="muted">Current network: {{ status.get('ssid') or 'Not reported' }}{% if status.get('pending') %} ·
+                Wi-Fi update pending{% elif status.get('result') %} · Last update: {{ status.get('result') }}{% if
+                status.get('reason') %} ({{ status.get('reason') }}){% endif %}{% endif %}</p>
+            <form method="post" action="/config/wifi"><input type="hidden" name="_csrf_token"
+                    value="{{ csrf_token }}"><input type="hidden" name="device_id" value="{{ device.id }}"><label
+                    for="ssid-{{ device.id }}">Wi-Fi network name</label><input id="ssid-{{ device.id }}" name="ssid"
+                    maxlength="32" required><label for="password-{{ device.id }}">Wi-Fi password</label><input
+                    id="password-{{ device.id }}" name="wifi_password" type="password" maxlength="128"
+                    autocomplete="new-password" required><button type="submit">Queue Wi-Fi update</button></form>
+        </section>{% else %}<p class="muted">Enroll a camera before configuring Wi-Fi.</p>{% endfor %}
+    </main>
+</body>
+
+</html>

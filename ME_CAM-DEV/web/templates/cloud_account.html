@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ME_CAM | Account</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #f1f4f0;
+            --muted: #a1aaa4;
+            --bg: #121715;
+            --panel: #1b2220;
+            --line: #343e39;
+            --green: #9fdf72;
+            --red: #ff9689
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font: 15px/1.45 "Segoe UI", sans-serif
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 14px clamp(16px, 4vw, 48px);
+            border-bottom: 1px solid var(--line)
+        }
+
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px
+        }
+
+        a {
+            color: var(--green)
+        }
+
+        nav a {
+            color: var(--muted);
+            text-decoration: none
+        }
+
+        .brand {
+            font-weight: 700
+        }
+
+        .brand b {
+            color: var(--green)
+        }
+
+        main {
+            width: min(620px, 94vw);
+            margin: 36px auto
+        }
+
+        section {
+            border-top: 2px solid var(--green);
+            padding: 20px 0
+        }
+
+        label {
+            display: block;
+            margin: 14px 0 6px
+        }
+
+        input {
+            width: 100%;
+            padding: 11px;
+            background: #0d1210;
+            color: var(--ink);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            font: inherit
+        }
+
+        button {
+            margin-top: 16px;
+            padding: 10px 14px;
+            background: var(--green);
+            border: 0;
+            border-radius: 4px;
+            color: #14200e;
+            font-weight: 700
+        }
+
+        .error {
+            color: var(--red)
+        }
+
+        .notice {
+            color: var(--green)
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="brand"><b>ME</b>_CAM</div>
+        <nav><a href="/dashboard">Dashboard</a><a href="/dashboard#devices">Devices</a><a href="/events">Events</a><a
+                href="/config">Config</a><a href="/account">Account</a></nav>
+    </header>
+    <main>
+        <h1>Account</h1>
+        <p class="muted">Signed in as {{ username }}</p>
+        <section>
+            <h2>Change password</h2>
+            <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token }}"><label
+                    for="current">Current password</label><input id="current" name="current_password" type="password"
+                    autocomplete="current-password" required><label for="new">New password</label><input id="new"
+                    name="new_password" type="password" minlength="12" autocomplete="new-password" required><button
+                    type="submit">Update password</button></form>{% if error %}<p class="error">{{ error }}</p>{% endif
+            %}{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+        </section>
+    </main>
+</body>
+
+</html>

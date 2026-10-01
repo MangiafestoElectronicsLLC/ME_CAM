@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ME_CAM | Events</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #f1f4f0;
+            --muted: #a1aaa4;
+            --bg: #121715;
+            --panel: #1b2220;
+            --line: #343e39;
+            --green: #9fdf72;
+            --blue: #82c7df;
+            --red: #ff8276
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font: 15px/1.45 "Segoe UI", sans-serif
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 14px clamp(16px, 4vw, 48px);
+            border-bottom: 1px solid var(--line)
+        }
+
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px
+        }
+
+        a {
+            color: var(--blue)
+        }
+
+        nav a {
+            color: var(--muted);
+            text-decoration: none
+        }
+
+        .brand {
+            font-weight: 700
+        }
+
+        .brand b {
+            color: var(--green)
+        }
+
+        main {
+            width: min(1180px, 94vw);
+            margin: 28px auto
+        }
+
+        h1 {
+            font-size: 25px
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 12px
+        }
+
+        .event {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            padding: 14px;
+            border-radius: 4px
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px
+        }
+
+        button {
+            font: inherit;
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            background: #28312d;
+            color: var(--ink);
+            cursor: pointer
+        }
+
+        .delete {
+            border-color: #8c4c42;
+            color: #ffd9d3
+        }
+
+        form {
+            display: inline
+        }
+
+        @media(max-width:680px) {
+            header {
+                align-items: flex-start;
+                flex-direction: column
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="brand"><b>ME</b>_CAM</div>
+        <nav><a href="/dashboard">Dashboard</a><a href="/dashboard#devices">Devices</a><a href="/events">Events</a><a
+                href="/config">Config</a><a href="/account">Account</a></nav>
+    </header>
+    <main>
+        <h1>Motion events</h1>
+        <p class="muted">Latest retained recordings from your cameras. Each camera keeps its newest 10 events.</p>
+        <div class="grid">{% for event in events %}<article class="event"><strong>{{ event.camera_name }}</strong>
+                <div>{{ event.created_at }}</div>
+                <div class="muted">{{ event.duration_seconds or '—' }} sec{% if event.has_audio %} · audio{% endif %}
+                </div>
+                <div class="actions">{% if event.has_clip %}<a
+                        href="{{ url_for('event_clip', event_id=event.id) }}">View</a><a
+                        href="{{ url_for('event_clip', event_id=event.id, download=1) }}">Download</a>{% endif %}
+                    <form method="post" action="{{ url_for('delete_event', event_id=event.id) }}"
+                        onsubmit="return confirm('Delete this event and its stored clip?')"><input type="hidden"
+                            name="_csrf_token" value="{{ csrf_token }}"><button class="delete"
+                            type="submit">Delete</button></form>
+                </div>
+            </article>{% else %}<p class="muted">No motion events saved yet.</p>{% endfor %}</div>
+    </main>
+</body>
+
+</html>
