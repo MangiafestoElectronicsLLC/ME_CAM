@@ -26,6 +26,47 @@ Open the printed private-LAN URL from a device on the same Wi-Fi. Allow inbound 
 
 Replace the host/IP with a printed LAN address. This mode sends the device token, microphone audio, and motion clips over plain HTTP, so use it only on a trusted private LAN. Do not port-forward this service or expose it to the public internet. Use the HTTPS deployment below for remote access.
 
+## Free Remote Access (Self-Hosted)
+
+To avoid a paid hosted dashboard, you can keep the dashboard and recordings on your Windows computer and publish it through a free Cloudflare Quick Tunnel. The computer must stay on and connected to the internet. Quick Tunnel URLs are temporary and change when the tunnel restarts; enroll cameras again with the new URL if that happens. This is suitable for personal use, but it is not an uptime guarantee or a backup service.
+
+1. Install Cloudflare Tunnel and the Windows production server dependencies:
+
+   ```powershell
+   winget install --id Cloudflare.cloudflared
+   python -m pip install "Flask>=3.1,<4" "waitress>=3,<4" "cryptography>=42,<47"
+   ```
+
+2. In the first PowerShell window, start the dashboard from `ME_CAM-DEV`:
+
+   ```powershell
+   .\run_mecam.ps1 -HttpsProxy
+   ```
+
+	On first start, keep the printed owner setup key private and use it once to create your owner account.
+
+3. In a second PowerShell window, create the HTTPS tunnel:
+
+   ```powershell
+   cloudflared tunnel --url http://127.0.0.1:8081
+   ```
+
+	Open the `https://...trycloudflare.com` URL printed by the command, create/sign in to your dashboard, and add a camera from Devices.
+
+4. Enroll a Pi with the new HTTPS URL and the one-time camera enrollment code:
+
+   ```powershell
+   .\ssh_install_pi.ps1 -PiHost pi@<camera-hostname-or-ip> -DashboardUrl https://<tunnel-name>.trycloudflare.com
+   ```
+
+Quick Tunnels are publicly reachable, so use a unique owner password of at least 12 characters, keep the setup key and enrollment codes private, and stop `cloudflared` when remote access is not needed. Do not expose port 8081 directly on your router. Your database, encryption keys, and footage remain in `ME_CAM-DEV/cloud_data`; back that folder up securely. If you stop the dashboard or tunnel, or the host loses internet/power, remote camera access and uploads stop.
+
+## Admin and Customer Accounts
+
+The first owner account is the administrator. Admins can enroll and manage every camera. From **Account**, an admin can create a one-use invitation for either another admin or a customer; it expires after 24 hours. Customers can control only cameras assigned to their account.
+
+Enroll a camera while signed in as admin, then use **Transfer device to customer** on its dashboard entry. Existing event history stays admin-only unless **Include existing recordings** is selected. A transfer revokes temporary share links and queued Wi-Fi changes; transferring the device back to admin inventory immediately removes the customer's camera and event access.
+
 ## Render and me-cam.com
 
 1. Push this repository to a Git provider and create a Render Blueprint from `render.yaml`.

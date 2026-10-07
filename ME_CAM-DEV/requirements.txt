@@ -1,28 +1,25 @@
 # Core
-Flask==2.2.5
-Werkzeug==2.2.3
+Flask>=2.3,<4
+Werkzeug>=2.3,<4
 
 # Camera + Image Processing
-numpy==1.19.5
-opencv-python-headless==4.5.1.48
-Pillow==9.5.0
+numpy>=1.23.5,<2
+opencv-python-headless>=4.8,<5
+Pillow>=9.5,<12
 
 # Encryption
-cryptography==39.0.0
+cryptography>=39,<45
 
 # QR Codes
 qrcode[pil]==7.4.2
 
 # System utilities
-psutil==5.9.5
+psutil>=5.9.5,<7
 
 # Email + Cloud
 yagmail==0.15.293
 pydrive2==1.19.0
 
 # Optional AI (TFLite)
-tflite-runtime==2.7.0
-
-
 # Logging helpers
-loguru==0.7.2
+loguru>=0.7.2,<1

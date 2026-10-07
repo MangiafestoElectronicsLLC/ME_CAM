@@ -117,7 +117,7 @@
     </header>
     <main>
         <h1>Account</h1>
-        <p class="muted">Signed in as {{ username }}</p>
+        <p class="muted">Signed in as {{ username }} · {{ role|title }}</p>
         <section>
             <h2>Change password</h2>
             <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token }}"><label
@@ -127,6 +127,21 @@
                     type="submit">Update password</button></form>{% if error %}<p class="error">{{ error }}</p>{% endif
             %}{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
         </section>
+        {% if role == 'admin' %}<section>
+            <h2>Invite a trusted user</h2>
+            <p class="muted">Admin accounts manage every device. Customer accounts can control only devices transferred
+                to them. Each invitation works once for 24 hours.</p>
+            <form method="post" action="/account/invite"><input type="hidden" name="_csrf_token"
+                    value="{{ csrf_token }}"><label for="invite-role">Account type</label><select id="invite-role"
+                    name="role">
+                    <option value="customer">Customer</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <button type="submit">Create invitation</button>
+            </form>
+            {% if invite_code %}<p>Share this one-time code with the trusted user:</p><code>{{ invite_code }}</code>{%
+            endif %}
+        </section>{% endif %}
     </main>
 </body>
 

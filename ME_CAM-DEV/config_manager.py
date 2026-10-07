@@ -2,6 +2,8 @@ import json
 import os
 from threading import RLock
 
+from hardware_profile import get_camera_profile
+
 CONFIG_PATH = "config/config.json"
 DEFAULT_CONFIG_PATH = "config/config_default.json"
 
@@ -23,6 +25,10 @@ def get_config():
             os.makedirs("config", exist_ok=True)
             if not os.path.exists(CONFIG_PATH):
                 default = _load_json(DEFAULT_CONFIG_PATH)
+                profile = get_camera_profile()
+                default["stream_resolution"] = profile["resolution"]
+                default["stream_fps"] = profile["fps"]
+                default["face_recognition_enabled"] = profile["face_recognition"]
                 with open(CONFIG_PATH, "w") as f:
                     json.dump(default, f, indent=2)
                 _config_cache = default

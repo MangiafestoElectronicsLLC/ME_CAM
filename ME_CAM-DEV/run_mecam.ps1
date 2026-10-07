@@ -1,5 +1,6 @@
 param(
     [switch]$Lan,
+    [switch]$HttpsProxy,
     [int]$Port = 8081
 )
 
@@ -25,7 +26,13 @@ $env:MECAM_STORAGE_KEY = Get-OrCreateSecret (Join-Path $dataDir '.media-secret')
 $env:MECAM_SETUP_KEY = Get-OrCreateSecret (Join-Path $dataDir '.owner-setup-key')
 $env:MECAM_COOKIE_SECURE = '0'
 $env:PORT = [string]$Port
-if ($Lan) {
+if ($HttpsProxy) {
+    if ($Lan) { throw 'Use either -Lan or -HttpsProxy, not both.' }
+    $env:MECAM_COOKIE_SECURE = '1'
+    $env:MECAM_HOST = '127.0.0.1'
+    Write-Host "ME_CAM HTTPS-proxy origin: http://127.0.0.1:$Port"
+    Write-Host 'The origin is private to this computer; expose it only through your HTTPS tunnel.'
+} elseif ($Lan) {
     $env:MECAM_HOST = '0.0.0.0'
     $addresses = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
         Where-Object {
@@ -45,7 +52,11 @@ Write-Host 'Press Ctrl+C to stop the dashboard.'
 
 Push-Location $PSScriptRoot
 try {
-    python cloud_dashboard.py
+    if ($HttpsProxy) {
+        python -m waitress --listen="127.0.0.1:$Port" cloud_dashboard:app
+    } else {
+        python cloud_dashboard.py
+    }
 } finally {
     Pop-Location
 }

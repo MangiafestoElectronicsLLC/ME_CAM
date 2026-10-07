@@ -140,22 +140,22 @@
     </header>
 
     <div class="settings-container">
-        <form method="POST" action="{{ url_for('settings') }}">
+        <form method="POST" action="{{ url_for('settings') }}" enctype="multipart/form-data">
 
             <!-- System Integration Section -->
             <div class="settings-section">
                 <h3>🔧 System Integration</h3>
 
                 <div class="checkbox-group">
-                    <input type="checkbox" id="wifi_enabled" name="wifi_enabled"
-                        {% if config.get('wifi_enabled') %}checked{% endif %}>
+                    <input type="checkbox" id="wifi_enabled" name="wifi_enabled" {% if config.get('wifi_enabled')
+                        %}checked{% endif %}>
                     <label for="wifi_enabled">WiFi Configuration</label>
                 </div>
                 <p class="help-text">Enable WiFi management interface</p>
 
                 <div class="checkbox-group">
-                    <input type="checkbox" id="bluetooth_enabled" name="bluetooth_enabled"
-                        {% if config.get('bluetooth_enabled') %}checked{% endif %}>
+                    <input type="checkbox" id="bluetooth_enabled" name="bluetooth_enabled" {% if
+                        config.get('bluetooth_enabled') %}checked{% endif %}>
                     <label for="bluetooth_enabled">Bluetooth Support</label>
                 </div>
                 <p class="help-text">Enable Bluetooth pairing for remote control</p>
@@ -166,8 +166,8 @@
                 <h3>📧 Email Notifications</h3>
 
                 <div class="checkbox-group">
-                    <input type="checkbox" id="email_enabled" name="email_enabled"
-                        {% if config.get('email', {}).get('enabled') %}checked{% endif %}>
+                    <input type="checkbox" id="email_enabled" name="email_enabled" {% if config.get('email',
+                        {}).get('enabled') %}checked{% endif %}>
                     <label for="email_enabled">Enable Email Alerts</label>
                 </div>
                 <p class="help-text">Send motion detection alerts via email</p>
@@ -216,8 +216,8 @@
                 <h3>☁️ Google Drive Backup</h3>
 
                 <div class="checkbox-group">
-                    <input type="checkbox" id="gdrive_enabled" name="gdrive_enabled"
-                        {% if config.get('google_drive', {}).get('enabled') %}checked{% endif %}>
+                    <input type="checkbox" id="gdrive_enabled" name="gdrive_enabled" {% if config.get('google_drive',
+                        {}).get('enabled') %}checked{% endif %}>
                     <label for="gdrive_enabled">Enable Google Drive Backup</label>
                 </div>
                 <p class="help-text">Automatically upload recordings to Google Drive</p>
@@ -238,14 +238,20 @@
                 <div class="form-group">
                     <label for="stream_resolution">Stream Resolution</label>
                     <select id="stream_resolution" name="stream_resolution">
-                        <option value="640x480" {% if config.get('stream_resolution') == "640x480" %}selected{% endif %}>
+                        <option value="640x480" {% if config.get('stream_resolution')=="640x480" %}selected{% endif %}>
                             640 × 480 (Fastest)
                         </option>
-                        <option value="1280x720" {% if config.get('stream_resolution') == "1280x720" %}selected{% endif %}>
+                        <option value="1280x720" {% if config.get('stream_resolution')=="1280x720" %}selected{% endif
+                            %}>
                             1280 × 720 (HD)
                         </option>
-                        <option value="1536x864" {% if config.get('stream_resolution') == "1536x864" %}selected{% endif %}>
+                        <option value="1536x864" {% if config.get('stream_resolution')=="1536x864" %}selected{% endif
+                            %}>
                             1536 × 864 (IMX708 Native)
+                        </option>
+                        <option value="1920x1080" {% if config.get('stream_resolution')=="1920x1080" %}selected{% endif
+                            %}>
+                            1920 × 1080 (Full HD)
                         </option>
                     </select>
                     <p class="help-text">Choose the resolution for live video streaming</p>
@@ -253,11 +259,30 @@
 
                 <div class="form-group">
                     <label for="stream_fps">Stream FPS</label>
-                    <input type="number" id="stream_fps" name="stream_fps" min="5" max="30"
+                    <input type="number" id="stream_fps" name="stream_fps" min="5" max="{{ max_stream_fps }}"
                         value="{{ config.get('stream_fps', 15) }}">
-                    <p class="help-text">Higher FPS = smoother video but more CPU usage</p>
+                    <p class="help-text">Up to {{ max_stream_fps }} FPS on this Pi; actual limits depend on the camera
+                        and resolution.</p>
                 </div>
             </div>
+
+            {% if face_recognition_supported %}
+            <div class="settings-section">
+                <h3>Face Recognition</h3>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="face_recognition_enabled" name="face_recognition_enabled" {% if
+                        config.get('face_recognition_enabled', true) %}checked{% endif %}>
+                    <label for="face_recognition_enabled">Enable face recognition</label>
+                </div>
+                <div class="form-group">
+                    <label for="known_faces">Known people (name each image file)</label>
+                    <input type="file" id="known_faces" name="known_faces" accept="image/jpeg,image/png" multiple>
+                </div>
+                <p class="help-text">Upload a clear, front-facing JPG or PNG for each person. The filename becomes the
+                    displayed name.</p>
+                <p class="help-text" id="face_status">Loading recognition status...</p>
+            </div>
+            {% endif %}
 
             <!-- Submit Button -->
             <button type="submit" class="btn-save">💾 Save Settings</button>
@@ -275,3 +300,27 @@
         });
 
         document.getElementById('gdrive_enabled').addEventListener('change', function () {
+            document.getElementById('gdrive_config').classList.toggle('active', this.checked);
+        });
+
+        const faceStatus = document.getElementById('face_status');
+        if (faceStatus) {
+            const refreshFaceStatus = () => fetch('/api/faces/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.available) {
+                        faceStatus.textContent = 'Face recognition runtime is not installed.';
+                    } else if (!data.known_faces) {
+                        faceStatus.textContent = 'No known faces uploaded.';
+                    } else {
+                        faceStatus.textContent = `Recognized: ${data.recognized.join(', ') || 'No known faces in view'}`;
+                    }
+                })
+                .catch(() => { faceStatus.textContent = 'Recognition status unavailable.'; });
+            refreshFaceStatus();
+            setInterval(refreshFaceStatus, 3000);
+        }
+    </script>
+</body>
+
+</html>

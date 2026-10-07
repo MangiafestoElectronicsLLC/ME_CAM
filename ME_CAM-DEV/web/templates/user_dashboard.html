@@ -79,6 +79,9 @@
             <div class="camera-feed">
                 <img src="/stream.mjpg" alt="Live camera feed" style="width: 100%; height: auto;">
             </div>
+            {% if face_recognition_supported %}
+            <p id="face-recognition-status" aria-live="polite">Face recognition status unavailable.</p>
+            {% endif %}
         </div>
 
         <!-- Quick Actions -->
@@ -163,6 +166,24 @@
                 })
                 .catch(e => console.error(e));
         }, 10000);
+
+        const faceStatus = document.getElementById('face-recognition-status');
+        if (faceStatus) {
+            const refreshFaceStatus = () => fetch('/api/faces/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.available) {
+                        faceStatus.textContent = 'Face recognition runtime is not installed.';
+                    } else if (!data.known_faces) {
+                        faceStatus.textContent = 'No known faces uploaded.';
+                    } else {
+                        faceStatus.textContent = `Recognized: ${data.recognized.join(', ') || 'No known faces in view'}`;
+                    }
+                })
+                .catch(() => { faceStatus.textContent = 'Recognition status unavailable.'; });
+            refreshFaceStatus();
+            setInterval(refreshFaceStatus, 3000);
+        }
     </script>
 </body>
 

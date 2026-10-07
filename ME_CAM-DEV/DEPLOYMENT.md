@@ -1,10 +1,11 @@
 # ME_CAM Deployment Guide
 
 ## Overview
-This document covers deploying the ME_CAM security system to your Raspberry Pi Zero 2 W with ArduCAM and USB power bank.
+This document covers deploying ME_CAM to Raspberry Pi Zero 2 W, Raspberry Pi 4, and Raspberry Pi 5 devices.
 
 ## Prerequisites
-- Raspberry Pi Zero 2 W running Raspberry Pi OS Bullseye or later
+- Raspberry Pi Zero 2 W, Raspberry Pi 4, or Raspberry Pi 5 running Raspberry Pi OS Bullseye or later
+- Raspberry Pi OS 64-bit recommended for Pi 4 and Pi 5
 - ArduCAM USB camera module
 - External USB power bank
 - Network connection (WiFi via USB adapter or Ethernet)
@@ -16,7 +17,7 @@ This document covers deploying the ME_CAM security system to your Raspberry Pi Z
 
 ### 1.1 Flash SD Card
 - Download Raspberry Pi Imager from https://www.raspberrypi.com/software/
-- Insert SD card and flash with **Raspberry Pi OS Lite (32-bit)**
+- Insert SD card and flash with **Raspberry Pi OS Lite** (use 64-bit on Pi 4 and Pi 5)
 - During flash, set hostname, username/password, and WiFi details in Advanced Options
 
 ### 1.2 Connect Pi and Enable SSH
@@ -25,30 +26,23 @@ ssh pi@<pi-ip>
 # Default: pi@raspberrypi.local
 ```
 
-### 1.3 Update System
+### 1.3 Update System and Install Dependencies
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3-pip python3-dev libatlas-base-dev libjasper-dev libtiff5 \
-    libjasper1 libharfbuzz0b libwebp6 libopenjp2-7 libopenjp2-7-dev \
-    libopenjpip7 libtiff5 libharfbuzz0b libwebp6 python3-opencv
+cd ME_CAM-DEV
+chmod +x setup.sh
+./setup.sh
 ```
 
-### 1.4 Install Python Dependencies
-```bash
-pip3 install --upgrade pip
-pip3 install cryptography opencv-python loguru flask
-```
-
-### 1.5 Enable Camera
+### 1.4 Enable Camera
 ```bash
 sudo raspi-config
-# Navigate to: Interfacing Options > Camera > Enable
-# Reboot: sudo reboot
+# Reboot if prompted
 ```
 
-### 1.6 Verify Camera
+### 1.5 Verify Camera
 ```bash
-libcamera-hello --list-cameras
+rpicam-hello --list-cameras || libcamera-hello --list-cameras
 # Should list your ArduCAM module
 ```
 

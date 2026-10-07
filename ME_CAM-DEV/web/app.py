@@ -2,9 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from threading import Event
 from loguru import logger
 import os
+from io import BytesIO
 from datetime import datetime
 import time
 import sys
+from werkzeug.utils import secure_filename
+from PIL import Image
 
 # Add parent directory to path so we can import modules from the root
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,10 +19,12 @@ from battery_monitor import BatteryMonitor
 from thumbnail_gen import extract_thumbnail
 from user_auth import authenticate, create_user, user_exists, get_user
 from qr_generator import generate_setup_qr
+from hardware_profile import get_camera_profile
 
 # Flask app
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = os.urandom(24)
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
 # Core services
 watchdog = CameraWatchdog()
@@ -218,6 +223,7 @@ def index():
     username = session.get("username", "User")
     try:
         cfg = get_config()
+        profile = get_camera_profile()
         status = watchdog.status()
         battery_status = battery.get_status()
         videos = get_recordings(cfg, limit=12)
@@ -236,7 +242,8 @@ def index():
             video_count=len(videos),
             videos=videos,
             history_count=history_count,
-            emergency_phone=cfg.get("emergency_phone", "Not configured")
+            emergency_phone=cfg.get("emergency_phone", "Not configured"),
+            face_recognition_supported=profile["face_recognition"],
         )
     except Exception as e:
         logger.warning(f"[DASHBOARD] Fallback: {e}")
@@ -306,19 +313,61 @@ def settings():
 
             # NEW: Resolution + FPS
             cfg["stream_resolution"] = request.form.get("stream_resolution", "1536x864")
-            cfg["stream_fps"] = int(request.form.get("stream_fps", 15))
+            profile = get_camera_profile()
+            stream_fps = int(request.form.get("stream_fps", profile["fps"]))
+            if not 5 <= stream_fps <= profile["max_fps"]:
+                raise ValueError(f"Stream FPS must be between 5 and {profile['max_fps']} for this Raspberry Pi.")
+            cfg["stream_fps"] = stream_fps
+
+            face_profile = get_camera_profile()
+            cfg["face_recognition_enabled"] = bool(
+                face_profile["face_recognition"] and request.form.get("face_recognition_enabled") == "on"
+            )
+            uploaded_faces = request.files.getlist("known_faces")
+            whitelist_dir = os.path.join(BASE_DIR, "faces", "whitelist")
+            for uploaded_face in uploaded_faces:
+                if not uploaded_face or not uploaded_face.filename:
+                    continue
+                filename = secure_filename(uploaded_face.filename)
+                if not filename.lower().endswith((".jpg", ".jpeg", ".png")):
+                    raise ValueError("Known face images must be JPG or PNG files.")
+                image_data = uploaded_face.read()
+                try:
+                    with Image.open(BytesIO(image_data)) as image:
+                        image.verify()
+                except Exception as exc:
+                    raise ValueError(f"Invalid image file: {filename}") from exc
+                os.makedirs(whitelist_dir, exist_ok=True)
+                with open(os.path.join(whitelist_dir, filename), "wb") as image_file:
+                    image_file.write(image_data)
 
             save_config(cfg)
             pipeline.update_stream_settings()
+            pipeline.update_face_recognition(cfg["face_recognition_enabled"])
+            if uploaded_faces:
+                pipeline.reload_face_whitelist()
 
             logger.info("[SETTINGS] Configuration updated successfully.")
             return redirect(url_for("settings"))
 
         except Exception as e:
             logger.error(f"[SETTINGS] Error saving configuration: {e}")
-            return render_template("config.html", config=cfg, error=f"Failed to save settings: {str(e)}")
+            profile = get_camera_profile()
+            return render_template(
+                "config.html",
+                config=cfg,
+                error=f"Failed to save settings: {str(e)}",
+                max_stream_fps=profile["max_fps"],
+                face_recognition_supported=profile["face_recognition"],
+            )
 
-    return render_template("config.html", config=cfg)
+    profile = get_camera_profile()
+    return render_template(
+        "config.html",
+        config=cfg,
+        max_stream_fps=profile["max_fps"],
+        face_recognition_supported=profile["face_recognition"],
+    )
 
 
 # ------------------------------
@@ -328,6 +377,13 @@ def settings():
 @app.route("/api/status")
 def api_status():
     return jsonify(watchdog.status())
+
+
+@app.route("/api/faces/status")
+def api_faces_status():
+    if not require_auth():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify(pipeline.face_status())
 
 
 @app.route("/api/trigger_emergency", methods=["POST"])

@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ME_CAM | {{ 'Sign in' if login else 'Initial setup' }}</title>
+    <title>ME_CAM | {{ 'Sign in' if login else 'Create account' if register else 'Initial setup' }}</title>
     <style>
         :root {
             color-scheme: dark;
@@ -76,25 +76,35 @@
             color: #ff9689;
             margin-top: 12px;
         }
+
+        a {
+            color: var(--green);
+        }
     </style>
 </head>
 
 <body>
     <main>
         <h1>ME_CAM</h1>
-        <p>{{ 'Sign in to your camera dashboard.' if login else 'Create the dashboard owner account.' }}</p>
+        <p>{{ 'Sign in to your camera dashboard.' if login else 'Create an account with an invitation.' if register else
+            'Create the dashboard owner account.' }}</p>
         <form method="post">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-            {% if not login %}<label for="username">Username</label><input id="username" name="username" minlength="3"
-                required autocomplete="username">{% else %}<label for="username">Username</label><input id="username"
-                name="username" required autocomplete="username">{% endif %}
-            {% if not login %}<label for="setup_key">Setup key</label><input id="setup_key" name="setup_key"
-                type="password" autocomplete="off">{% endif %}
+            <label for="username">Username</label><input id="username" name="username"
+                minlength="{{ 1 if login else 3 }}" required autocomplete="username">
+            {% if register %}<label for="invite_code">Invitation code</label><input id="invite_code" name="invite_code"
+                required autocomplete="off">{% elif not login %}<label for="setup_key">Setup key</label><input
+                id="setup_key" name="setup_key" type="password" autocomplete="off">{% endif %}
             <label for="password">{{ 'Password' if login else 'Password (12 characters minimum)' }}</label>
             <input id="password" name="password" type="password" minlength="{{ 1 if login else 12 }}" required
                 autocomplete="{{ 'current-password' if login else 'new-password' }}">
-            <button type="submit">{{ 'Sign in' if login else 'Create owner account' }}</button>
+            <button type="submit">{{ 'Sign in' if login else 'Create account' if register else 'Create owner account'
+                }}</button>
         </form>
+        {% if login %}<p><a href="{{ url_for('register') }}">Create account</a></p>{% endif %}
+        {% if register %}<p>Invitation-only. Admin accounts manage every camera; customer accounts can access only
+            assigned devices.</p>
+        <p><a href="{{ url_for('login') }}">Back to sign in</a></p>{% endif %}
         {% if error %}<div class="error">{{ error }}</div>{% endif %}
     </main>
 </body>

@@ -59,7 +59,14 @@ def _init_db(app):
             CREATE TABLE IF NOT EXISTS users (
                 username TEXT PRIMARY KEY,
                 password_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'admin'
+            );
+            CREATE TABLE IF NOT EXISTS account_invites (
+                token_hash TEXT PRIMARY KEY,
+                created_by TEXT NOT NULL,
+                expires_at REAL NOT NULL,
+                role TEXT NOT NULL DEFAULT 'customer'
             );
             CREATE TABLE IF NOT EXISTS devices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +78,8 @@ def _init_db(app):
                 status_json TEXT NOT NULL DEFAULT '{}',
                 stream_url TEXT,
                 last_seen TEXT,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                owner_username TEXT REFERENCES users(username)
             );
             CREATE TABLE IF NOT EXISTS enrollments (
                 code_hash TEXT PRIMARY KEY,
@@ -88,7 +96,8 @@ def _init_db(app):
                 created_at TEXT NOT NULL,
                 duration_seconds INTEGER,
                 has_audio INTEGER NOT NULL DEFAULT 0,
-                metadata_json TEXT NOT NULL DEFAULT '{}'
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                owner_username TEXT REFERENCES users(username)
             );
             CREATE TABLE IF NOT EXISTS shares (
                 token_hash TEXT PRIMARY KEY,
@@ -107,6 +116,26 @@ def _init_db(app):
             CREATE INDEX IF NOT EXISTS events_device_created
                 ON events(device_id, created_at DESC);
         ''')
+        user_columns = {row[1] for row in db.execute('PRAGMA table_info(users)')}
+        if 'role' not in user_columns:
+            db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'customer'")
+            owner = db.execute(
+                'SELECT username FROM users ORDER BY created_at, username LIMIT 1'
+            ).fetchone()
+            if owner:
+                db.execute(
+                    "UPDATE users SET role = 'admin' WHERE username = ?",
+                    (owner[0],),
+                )
+        for table, column, definition in (
+                ('account_invites', 'role', "TEXT NOT NULL DEFAULT 'customer'"),
+                ('devices', 'owner_username', 'TEXT REFERENCES users(username)'),
+                ('events', 'owner_username', 'TEXT REFERENCES users(username)')):
+            columns = {row[1] for row in db.execute(f'PRAGMA table_info({table})')}
+            if column not in columns:
+                db.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
+        db.execute('CREATE INDEX IF NOT EXISTS devices_owner ON devices(owner_username)')
+        db.commit()
     finally:
         db.close()
 
@@ -135,6 +164,51 @@ def _login_required(fn):
             return redirect(url_for('login'))
         return fn(*args, **kwargs)
     return wrapped
+
+
+def _current_user_role():
+    username = session.get('username')
+    if not username:
+        return None
+    row = _db().execute('SELECT role FROM users WHERE username = ?', (username,)).fetchone()
+    return row['role'] if row else None
+
+
+def _admin_required(fn):
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        if not session.get('username'):
+            return redirect(url_for('login'))
+        if _current_user_role() != 'admin':
+            abort(403)
+        return fn(*args, **kwargs)
+    return wrapped
+
+
+def _accessible_device(camera_id):
+    device = _db().execute('SELECT * FROM devices WHERE id = ?', (camera_id,)).fetchone()
+    if device is None:
+        return None
+    if (_current_user_role() == 'admin'
+            or device['owner_username'] == session.get('username')):
+        return device
+    return None
+
+
+def _accessible_event(event_id):
+    event = _db().execute(
+        '''SELECT events.*, devices.owner_username AS device_owner
+           FROM events JOIN devices ON devices.id = events.device_id
+           WHERE events.id = ?''', (event_id,),
+    ).fetchone()
+    if event is None:
+        return None
+    if _current_user_role() == 'admin':
+        return event
+    username = session.get('username')
+    if event['device_owner'] == username and event['owner_username'] == username:
+        return event
+    return None
 
 
 def _device_required(fn):
@@ -263,14 +337,18 @@ def _save_event(device, event_type, content, mime_type, filename, duration=None,
         temp = target.with_suffix(target.suffix + '.tmp')
         temp.write_bytes(current_app.config['MEDIA_CIPHER'].encrypt(content))
         temp.replace(target)
+    owner = _db().execute(
+        'SELECT owner_username FROM devices WHERE id = ?', (device['id'],)
+    ).fetchone()
+    owner_username = owner['owner_username'] if owner else None
     _db().execute(
         '''INSERT INTO events
            (id, device_id, event_type, filename, mime_type, created_at,
-            duration_seconds, has_audio, metadata_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            duration_seconds, has_audio, metadata_json, owner_username)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         (event_id, device['id'], event_type, stored_name, mime_type,
          _utc_now(), duration, int(bool(has_audio)),
-         json.dumps(metadata or {}, separators=(',', ':'))),
+         json.dumps(metadata or {}, separators=(',', ':')), owner_username),
     )
     _db().commit()
     stale = _db().execute(
@@ -373,7 +451,7 @@ def create_app(test_config=None):
                 error = 'Use a username of at least 3 characters and a password of at least 12.'
             else:
                 _db().execute(
-                    'INSERT INTO users(username, password_hash, created_at) VALUES (?, ?, ?)',
+                    "INSERT INTO users(username, password_hash, created_at, role) VALUES (?, ?, ?, 'admin')",
                     (username, generate_password_hash(password), _utc_now()),
                 )
                 _db().commit()
@@ -400,6 +478,47 @@ def create_app(test_config=None):
                 return redirect(url_for('dashboard'))
             error = 'Invalid username or password.'
         return render_template('cloud_setup.html', login=True, error=error,
+                               csrf_token=_csrf_token())
+
+    @app.route('/register', methods=['GET', 'POST'])
+    def register():
+        if session.get('username'):
+            return redirect(url_for('dashboard'))
+        error = None
+        if request.method == 'POST':
+            _check_csrf()
+            username = request.form.get('username', '').strip()
+            password = request.form.get('password', '')
+            invite_code = request.form.get('invite_code', '').strip()
+            if len(username) < 3 or len(password) < 12:
+                error = 'Use a username of at least 3 characters and a password of at least 12.'
+            else:
+                invite_hash = _token_hash(invite_code)
+                invite = _db().execute(
+                    'SELECT token_hash, role FROM account_invites WHERE token_hash = ? AND expires_at > ?',
+                    (invite_hash, time.time()),
+                ).fetchone()
+                if invite is None:
+                    error = 'Invitation code is invalid or expired.'
+                else:
+                    try:
+                        _db().execute(
+                            'INSERT INTO users(username, password_hash, created_at, role) VALUES (?, ?, ?, ?)',
+                            (username, generate_password_hash(password), _utc_now(), invite['role']),
+                        )
+                        _db().execute(
+                            'DELETE FROM account_invites WHERE token_hash = ?',
+                            (invite_hash,),
+                        )
+                        _db().commit()
+                    except sqlite3.IntegrityError:
+                        _db().rollback()
+                        error = 'That username is already in use.'
+                    else:
+                        session.clear()
+                        session['username'] = username
+                        return redirect(url_for('dashboard'))
+        return render_template('cloud_setup.html', register=True, error=error,
                                csrf_token=_csrf_token())
 
     @app.post('/logout')
@@ -433,13 +552,45 @@ def create_app(test_config=None):
                 _db().commit()
                 session['account_notice'] = 'Password updated.'
                 return redirect(url_for('account'))
-        return render_template('cloud_account.html', username=session['username'],
-                               csrf_token=_csrf_token(), error=error, notice=notice)
+        return render_template(
+            'cloud_account.html', username=session['username'],
+            csrf_token=_csrf_token(), error=error, notice=notice,
+            invite_code=session.pop('registration_invite', None),
+            role=_current_user_role(),
+        )
+
+    @app.post('/account/invite')
+    @_admin_required
+    def create_account_invite():
+        _check_csrf()
+        username = session['username']
+        role = request.form.get('role', 'customer')
+        if role not in ('admin', 'customer'):
+            abort(400, description='Select a valid account role')
+        invite_code = secrets.token_urlsafe(24)
+        db = _db()
+        db.execute(
+            'DELETE FROM account_invites WHERE created_by = ? OR expires_at <= ?',
+            (username, time.time()),
+        )
+        db.execute(
+            'INSERT INTO account_invites(token_hash, created_by, expires_at, role) VALUES (?, ?, ?, ?)',
+            (_token_hash(invite_code), username, time.time() + 24 * 60 * 60, role),
+        )
+        db.commit()
+        session['registration_invite'] = invite_code
+        return redirect(url_for('account'))
 
     @app.route('/config', methods=['GET'])
     @_login_required
     def config_page():
-        devices = _db().execute('SELECT * FROM devices ORDER BY name').fetchall()
+        if _current_user_role() == 'admin':
+            devices = _db().execute('SELECT * FROM devices ORDER BY name').fetchall()
+        else:
+            devices = _db().execute(
+                'SELECT * FROM devices WHERE owner_username = ? ORDER BY name',
+                (session['username'],),
+            ).fetchall()
         device_status = {}
         for device in devices:
             try:
@@ -474,7 +625,7 @@ def create_app(test_config=None):
         password = request.form.get('wifi_password', '')
         if not ssid or len(ssid) > 32 or not password or len(password) > 128:
             abort(400, description='Enter a valid network name and password')
-        if _db().execute('SELECT 1 FROM devices WHERE id = ?', (device_id,)).fetchone() is None:
+        if _accessible_device(device_id) is None:
             abort(404)
         change_id = uuid.uuid4().hex
         cipher = current_app.config['MEDIA_CIPHER']
@@ -498,11 +649,20 @@ def create_app(test_config=None):
     @app.get('/events')
     @_login_required
     def events_page():
-        rows = _db().execute(
-            '''SELECT events.*, devices.name AS camera_name
-               FROM events JOIN devices ON devices.id = events.device_id
-               ORDER BY events.created_at DESC, events.rowid DESC LIMIT 100'''
-        ).fetchall()
+        if _current_user_role() == 'admin':
+            rows = _db().execute(
+                '''SELECT events.*, devices.name AS camera_name
+                   FROM events JOIN devices ON devices.id = events.device_id
+                   ORDER BY events.created_at DESC, events.rowid DESC LIMIT 100'''
+            ).fetchall()
+        else:
+            rows = _db().execute(
+                '''SELECT events.*, devices.name AS camera_name
+                   FROM events JOIN devices ON devices.id = events.device_id
+                   WHERE devices.owner_username = ? AND events.owner_username = ?
+                   ORDER BY events.created_at DESC, events.rowid DESC LIMIT 100''',
+                (session['username'], session['username']),
+            ).fetchall()
         return render_template(
             'cloud_events.html', events=[dict(_event_json(row), camera_name=row['camera_name'])
                                           for row in rows],
@@ -513,7 +673,7 @@ def create_app(test_config=None):
     @_login_required
     def delete_event(event_id):
         _check_csrf()
-        row = _db().execute('SELECT filename FROM events WHERE id = ?', (event_id,)).fetchone()
+        row = _accessible_event(event_id)
         if row is None:
             abort(404)
         if row['filename']:
@@ -532,14 +692,32 @@ def create_app(test_config=None):
     @app.get('/dashboard')
     @_login_required
     def dashboard():
-        devices = _db().execute(
-            'SELECT * FROM devices ORDER BY created_at DESC'
-        ).fetchall()
-        event_rows = _db().execute(
-            '''SELECT events.*, devices.name AS camera_name
-               FROM events JOIN devices ON devices.id = events.device_id
-             ORDER BY events.created_at DESC, events.rowid DESC LIMIT 10'''
-        ).fetchall()
+        is_admin = _current_user_role() == 'admin'
+        if is_admin:
+            devices = _db().execute(
+                'SELECT * FROM devices ORDER BY created_at DESC'
+            ).fetchall()
+            event_rows = _db().execute(
+                '''SELECT events.*, devices.name AS camera_name
+                   FROM events JOIN devices ON devices.id = events.device_id
+                   ORDER BY events.created_at DESC, events.rowid DESC LIMIT 10'''
+            ).fetchall()
+            customers = _db().execute(
+                "SELECT username FROM users WHERE role = 'customer' ORDER BY username"
+            ).fetchall()
+        else:
+            devices = _db().execute(
+                'SELECT * FROM devices WHERE owner_username = ? ORDER BY created_at DESC',
+                (session['username'],),
+            ).fetchall()
+            event_rows = _db().execute(
+                '''SELECT events.*, devices.name AS camera_name
+                   FROM events JOIN devices ON devices.id = events.device_id
+                   WHERE devices.owner_username = ? AND events.owner_username = ?
+                   ORDER BY events.created_at DESC, events.rowid DESC LIMIT 10''',
+                (session['username'], session['username']),
+            ).fetchall()
+            customers = []
         event_data = []
         for row in event_rows:
             item = _event_json(row)
@@ -552,23 +730,39 @@ def create_app(test_config=None):
             except (TypeError, ValueError):
                 status_by_device[device['id']] = {}
         online_by_device = {}
+        last_seen_ago_by_device = {}
         now = time.time()
         for device in devices:
             try:
                 seen_at = datetime.fromisoformat(device['last_seen']).timestamp()
-                online_by_device[device['id']] = now - seen_at < 120
+                age_seconds = max(0, int(now - seen_at))
+                online_by_device[device['id']] = age_seconds < 120
+                if age_seconds < 60:
+                    last_seen_ago_by_device[device['id']] = 'just now'
+                elif age_seconds < 3600:
+                    last_seen_ago_by_device[device['id']] = f'{age_seconds // 60} min ago'
+                elif age_seconds < 86400:
+                    last_seen_ago_by_device[device['id']] = f'{age_seconds // 3600} hr ago'
+                else:
+                    last_seen_ago_by_device[device['id']] = f'{age_seconds // 86400} days ago'
             except (TypeError, ValueError, OSError):
                 online_by_device[device['id']] = False
+                last_seen_ago_by_device[device['id']] = 'never'
+        online_count = sum(online_by_device.values())
         return render_template(
             'cloud_dashboard.html', username=session['username'], devices=devices,
             events=event_data, status_by_device=status_by_device,
             online_by_device=online_by_device,
+            last_seen_ago_by_device=last_seen_ago_by_device,
+            online_count=online_count, offline_count=len(devices) - online_count,
+            is_admin=is_admin, customers=customers,
             csrf_token=_csrf_token(), activation_code=session.pop('activation_code', None),
             share_url=session.pop('share_url', None),
+            notice=session.pop('config_notice', None),
         )
 
     @app.post('/cameras')
-    @_login_required
+    @_admin_required
     def create_camera():
         _check_csrf()
         name = request.form.get('name', '').strip()[:80]
@@ -583,11 +777,49 @@ def create_app(test_config=None):
         session['activation_code'] = code
         return redirect(url_for('dashboard'))
 
+    @app.post('/cameras/<int:camera_id>/transfer')
+    @_admin_required
+    def transfer_camera(camera_id):
+        _check_csrf()
+        device = _db().execute('SELECT id FROM devices WHERE id = ?', (camera_id,)).fetchone()
+        if device is None:
+            abort(404)
+        target_username = request.form.get('owner_username', '').strip()
+        if target_username:
+            target = _db().execute(
+                "SELECT username FROM users WHERE username = ? AND role = 'customer'",
+                (target_username,),
+            ).fetchone()
+            if target is None:
+                abort(400, description='Select a customer account')
+        if target_username and request.form.get('include_history') == '1':
+            _db().execute(
+                'UPDATE events SET owner_username = ? WHERE device_id = ?',
+                (target_username, camera_id),
+            )
+        _db().execute(
+            'UPDATE devices SET owner_username = ? WHERE id = ?',
+            (target_username or None, camera_id),
+        )
+        _db().execute('DELETE FROM shares WHERE device_id = ?', (camera_id,))
+        _db().execute('DELETE FROM wifi_changes WHERE device_id = ?', (camera_id,))
+        _db().commit()
+        with _STREAM_LOCK:
+            _STREAM_FRAMES.pop(camera_id, None)
+            _STREAM_VIEWERS.pop(camera_id, None)
+        with _AUDIO_LOCK:
+            _TALK_QUEUES.pop(camera_id, None)
+            _LISTENERS.pop(camera_id, None)
+            _LISTEN_CHUNKS.pop(camera_id, None)
+            _LISTEN_SEQUENCE.pop(camera_id, None)
+        session['config_notice'] = 'Camera access transferred. Previous share links and queued Wi-Fi changes were revoked.'
+        return redirect(url_for('dashboard'))
+
     @app.post('/cameras/<int:camera_id>/share')
     @_login_required
     def create_camera_share(camera_id):
         _check_csrf()
-        if _db().execute('SELECT 1 FROM devices WHERE id = ?', (camera_id,)).fetchone() is None:
+        if _accessible_device(camera_id) is None:
             abort(404)
         try:
             hours = int(request.form.get('hours', '24'))
@@ -608,6 +840,8 @@ def create_app(test_config=None):
     @_login_required
     def revoke_camera_shares(camera_id):
         _check_csrf()
+        if _accessible_device(camera_id) is None:
+            abort(404)
         _db().execute('DELETE FROM shares WHERE device_id = ?', (camera_id,))
         _db().commit()
         return redirect(url_for('dashboard'))
@@ -616,6 +850,8 @@ def create_app(test_config=None):
     @_login_required
     def set_camera_mode(camera_id):
         _check_csrf()
+        if _accessible_device(camera_id) is None:
+            abort(404)
         mode = request.form.get('mode')
         if mode not in ('security', 'standby'):
             abort(400, description='Mode must be security or standby')
@@ -630,9 +866,7 @@ def create_app(test_config=None):
     @app.get('/events/<event_id>/clip')
     @_login_required
     def event_clip(event_id):
-        row = _db().execute(
-            'SELECT filename, mime_type FROM events WHERE id = ?', (event_id,)
-        ).fetchone()
+        row = _accessible_event(event_id)
         if row is None or not row['filename']:
             abort(404)
         path = (Path(app.config['MEDIA_DIR']) / row['filename']).resolve()
@@ -650,9 +884,17 @@ def create_app(test_config=None):
     @app.get('/api/cameras/<int:camera_id>/events')
     @_login_required
     def camera_events(camera_id):
+        if _accessible_device(camera_id) is None:
+            abort(404)
+        if _current_user_role() == 'admin':
+            owner_filter = ''
+            params = (camera_id,)
+        else:
+            owner_filter = ' AND owner_username = ?'
+            params = (camera_id, session['username'])
         rows = _db().execute(
-            '''SELECT * FROM events WHERE device_id = ?
-             ORDER BY created_at DESC, rowid DESC LIMIT 10''', (camera_id,)
+            '''SELECT * FROM events WHERE device_id = ?''' + owner_filter +
+            ' ORDER BY created_at DESC, rowid DESC LIMIT 10', params
         ).fetchall()
         return jsonify({'events': [_event_json(row) for row in rows]})
 
@@ -660,7 +902,7 @@ def create_app(test_config=None):
     @_login_required
     def set_listen(camera_id):
         _check_csrf()
-        if _db().execute('SELECT 1 FROM devices WHERE id = ?', (camera_id,)).fetchone() is None:
+        if _accessible_device(camera_id) is None:
             abort(404)
         enabled = request.form.get('enabled') == '1'
         with _AUDIO_LOCK:
@@ -676,7 +918,7 @@ def create_app(test_config=None):
     @app.get('/api/cameras/<int:camera_id>/listen-audio')
     @_login_required
     def listen_audio(camera_id):
-        if _db().execute('SELECT 1 FROM devices WHERE id = ?', (camera_id,)).fetchone() is None:
+        if _accessible_device(camera_id) is None:
             abort(404)
         after = request.args.get('after', default=0, type=int)
         with _AUDIO_LOCK:
@@ -716,7 +958,7 @@ def create_app(test_config=None):
     @_login_required
     def queue_speak(camera_id):
         _check_csrf()
-        device = _db().execute('SELECT * FROM devices WHERE id = ?', (camera_id,)).fetchone()
+        device = _accessible_device(camera_id)
         if device is None:
             abort(404)
         content = request.get_data(cache=False)
@@ -758,7 +1000,7 @@ def create_app(test_config=None):
     @app.get('/camera/<int:camera_id>/stream.mjpg')
     @_login_required
     def cloud_stream(camera_id):
-        device = _db().execute('SELECT id FROM devices WHERE id = ?', (camera_id,)).fetchone()
+        device = _accessible_device(camera_id)
         if device is None:
             abort(404)
         with _STREAM_LOCK:

@@ -1,8 +1,10 @@
 import io
 import hashlib
 import re
+import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from pathlib import Path
 
@@ -67,6 +69,19 @@ class CloudDashboardTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()['device_id'], self.device_id)
         self.assertTrue(response.get_json()['armed'])
+
+    def test_offline_camera_shows_human_readable_last_checkin(self):
+        stale_time = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+        with self.app.app_context():
+            from cloud_dashboard import _db
+            _db().execute('UPDATE devices SET last_seen = ? WHERE id = 1', (stale_time,))
+            _db().commit()
+        page = self.client.get('/dashboard')
+        self.assertIn(b'5 days ago', page.data)
+        self.assertIn(b'Live view unavailable', page.data)
+        self.assertIn(b'Check camera power and network connection.', page.data)
+        self.assertIn(b'0</strong> online', page.data)
+        self.assertIn(b'1</strong> offline', page.data)
 
     def test_health_check_and_case_sensitive_activation_code(self):
         health = self.client.get('/healthz')
@@ -211,6 +226,205 @@ class CloudDashboardTests(unittest.TestCase):
             'setup_key': 'test-setup-secret',
         })
         self.assertEqual(response.status_code, 302)
+
+    def test_legacy_database_migrates_owner_and_customer_roles(self):
+        root = Path(self.temp_dir.name) / 'legacy'
+        root.mkdir()
+        database = root / 'legacy.sqlite3'
+        connection = sqlite3.connect(database)
+        connection.executescript('''
+            CREATE TABLE users (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            INSERT INTO users VALUES ('ME_LLC', 'hash', '2024-01-01');
+            INSERT INTO users VALUES ('legacy-customer', 'hash', '2025-01-01');
+            CREATE TABLE account_invites (
+                token_hash TEXT PRIMARY KEY,
+                created_by TEXT NOT NULL,
+                expires_at REAL NOT NULL
+            );
+            CREATE TABLE devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                activation_hash TEXT NOT NULL,
+                camera_mode TEXT NOT NULL DEFAULT 'security',
+                status_json TEXT NOT NULL DEFAULT '{}',
+                stream_url TEXT,
+                last_seen TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE events (
+                id TEXT PRIMARY KEY,
+                device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+                event_type TEXT NOT NULL,
+                filename TEXT,
+                mime_type TEXT,
+                created_at TEXT NOT NULL,
+                duration_seconds INTEGER,
+                has_audio INTEGER NOT NULL DEFAULT 0,
+                metadata_json TEXT NOT NULL DEFAULT '{}'
+            );
+        ''')
+        connection.commit()
+        connection.close()
+
+        create_app({
+            'TESTING': True,
+            'SECRET_KEY': 'migration-secret',
+            'DATABASE': str(database),
+            'MEDIA_DIR': str(root / 'events'),
+        })
+        connection = sqlite3.connect(database)
+        roles = dict(connection.execute('SELECT username, role FROM users'))
+        device_columns = {row[1] for row in connection.execute('PRAGMA table_info(devices)')}
+        event_columns = {row[1] for row in connection.execute('PRAGMA table_info(events)')}
+        invite_columns = {row[1] for row in connection.execute('PRAGMA table_info(account_invites)')}
+        connection.close()
+        self.assertEqual(roles, {'ME_LLC': 'admin', 'legacy-customer': 'customer'})
+        self.assertIn('owner_username', device_columns)
+        self.assertIn('owner_username', event_columns)
+        self.assertIn('role', invite_columns)
+
+    def test_account_registration_requires_a_one_time_owner_invitation(self):
+        login_page = self.client.get('/login')
+        self.assertIn(b'href="/register"', login_page.data)
+
+        guest_client = self.app.test_client()
+        register_page = guest_client.get('/register')
+        self.assertIn(b'customer accounts can access only assigned devices', register_page.data)
+        register_csrf = self._csrf(register_page)
+        rejected = guest_client.post('/register', data={
+            '_csrf_token': register_csrf,
+            'username': 'guest',
+            'password': 'correct-horse-battery-staple',
+            'invite_code': 'not-a-valid-invitation',
+        })
+        self.assertIn(b'Invitation code is invalid or expired', rejected.data)
+
+        account_page = self.client.get('/account')
+        invite_response = self.client.post('/account/invite', data={
+            '_csrf_token': self._csrf(account_page),
+        }, follow_redirects=True)
+        code_match = re.search(rb'<code>([^<]+)</code>', invite_response.data)
+        self.assertIsNotNone(code_match)
+        invite_code = code_match.group(1).decode()
+
+        created = guest_client.post('/register', data={
+            '_csrf_token': self._csrf(register_page),
+            'username': 'guest',
+            'password': 'correct-horse-battery-staple',
+            'invite_code': invite_code,
+        })
+        self.assertEqual(created.status_code, 302)
+        self.assertEqual(guest_client.get('/dashboard').status_code, 200)
+        reused_client = self.app.test_client()
+        reused_page = reused_client.get('/register')
+        reused = reused_client.post('/register', data={
+            '_csrf_token': self._csrf(reused_page),
+            'username': 'another-guest',
+            'password': 'correct-horse-battery-staple',
+            'invite_code': invite_code,
+        })
+        self.assertIn(b'Invitation code is invalid or expired', reused.data)
+
+    def test_customer_transfer_scopes_device_and_event_access(self):
+        dashboard = self.client.get('/dashboard')
+        created = self.client.post('/cameras', data={
+            '_csrf_token': self._csrf(dashboard),
+            'name': 'Admin-only camera',
+        }, follow_redirects=True)
+        code = re.search(rb'<code>([^<]+)</code>', created.data).group(1).decode()
+        activated = self.client.post('/api/device/activate', json={
+            'activation_code': code,
+            'device_id': 'mecam-admin-only',
+        })
+        self.assertEqual(activated.status_code, 200)
+
+        event = self.client.post('/api/motion/with-clip', headers={
+            'Authorization': f'Bearer {self.device_token}',
+        }, data={
+            'video': (io.BytesIO(b'fake-mp4-content'), 'event.mp4', 'video/mp4'),
+            'device_id': self.device_id,
+        }, content_type='multipart/form-data')
+        event_id = event.get_json()['event_id']
+
+        self.client.post('/config/wifi', data={
+            '_csrf_token': self._csrf(created),
+            'device_id': '1',
+            'ssid': 'PrivateNet',
+            'wifi_password': 'private-wifi-password',
+        })
+        with patch('cloud_dashboard.secrets.token_urlsafe', return_value='transfer-share-token'):
+            dashboard = self.client.get('/dashboard')
+            self.client.post('/cameras/1/share', data={
+                '_csrf_token': self._csrf(dashboard),
+                'hours': '24',
+            })
+        self.assertEqual(self.client.get('/share/transfer-share-token').status_code, 200)
+
+        account_page = self.client.get('/account')
+        invite = self.client.post('/account/invite', data={
+            '_csrf_token': self._csrf(account_page),
+            'role': 'customer',
+        }, follow_redirects=True)
+        invite_code = re.search(rb'<code>([^<]+)</code>', invite.data).group(1).decode()
+        customer = self.app.test_client()
+        register_page = customer.get('/register')
+        registration = customer.post('/register', data={
+            '_csrf_token': self._csrf(register_page),
+            'username': 'customer-one',
+            'password': 'correct-horse-battery-staple',
+            'invite_code': invite_code,
+        })
+        self.assertEqual(registration.status_code, 302)
+
+        dashboard = self.client.get('/dashboard')
+        transferred = self.client.post('/cameras/1/transfer', data={
+            '_csrf_token': self._csrf(dashboard),
+            'owner_username': 'customer-one',
+        })
+        self.assertEqual(transferred.status_code, 302)
+        self.assertEqual(self.client.get('/share/transfer-share-token').status_code, 404)
+        device_status = self.client.get('/api/device/status', headers={
+            'Authorization': f'Bearer {self.device_token}',
+        }).get_json()
+        self.assertNotIn('wifi_ssid', device_status)
+        customer_dashboard = customer.get('/dashboard')
+        self.assertIn(b'Front door', customer_dashboard.data)
+        self.assertNotIn(b'Admin-only camera', customer_dashboard.data)
+        customer_events = customer.get('/api/cameras/1/events')
+        self.assertEqual(customer_events.status_code, 200)
+        self.assertEqual(customer_events.get_json()['events'], [])
+        self.assertEqual(customer.get('/camera/2/stream.mjpg').status_code, 404)
+        self.assertEqual(customer.get(f'/events/{event_id}/clip').status_code, 404)
+        self.assertEqual(customer.post('/cameras').status_code, 403)
+        self.assertEqual(customer.post('/account/invite').status_code, 403)
+
+        dashboard = self.client.get('/dashboard')
+        included_history = self.client.post('/cameras/1/transfer', data={
+            '_csrf_token': self._csrf(dashboard),
+            'owner_username': 'customer-one',
+            'include_history': '1',
+        })
+        self.assertEqual(included_history.status_code, 302)
+        customer_events = customer.get('/api/cameras/1/events')
+        self.assertEqual(customer_events.get_json()['events'][0]['id'], event_id)
+        self.assertEqual(customer.get(f'/events/{event_id}/clip').status_code, 200)
+
+        dashboard = self.client.get('/dashboard')
+        returned = self.client.post('/cameras/1/transfer', data={
+            '_csrf_token': self._csrf(dashboard),
+            'owner_username': '',
+        })
+        self.assertEqual(returned.status_code, 302)
+        self.assertEqual(customer.get('/camera/1/stream.mjpg').status_code, 404)
+        self.assertEqual(customer.get('/api/cameras/1/events').status_code, 404)
+        self.assertEqual(self.client.get(f'/events/{event_id}').status_code, 404)
+        self.assertEqual(self.client.get(f'/events/{event_id}/clip').status_code, 200)
 
     def test_two_way_audio_transport(self):
         page = self.client.get('/dashboard')

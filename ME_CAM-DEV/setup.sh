@@ -1,48 +1,45 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "=== ME Camera Setup (Bullseye) ==="
+echo "=== ME Camera Setup ==="
 
-sudo apt update
-sudo apt install -y \
-python3.9 python3.9-venv python3.9-dev \
-libatlas-base-dev liblapack-dev gfortran \
-libjpeg-dev zlib1g-dev libopenjp2-7 libtiff-dev \
-libssl-dev libffi-dev libcamera-dev libcamera-apps \
-libopenexr25 libilmbase25 openexr git
+if [ "$(id -u)" -eq 0 ]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
+
+. /etc/os-release
+if [ "${VERSION_CODENAME:-bullseye}" = "bookworm" ] || [ "${VERSION_CODENAME:-}" = "trixie" ]; then
+  CAMERA_PACKAGE="rpicam-apps"
+else
+  CAMERA_PACKAGE="libcamera-apps"
+fi
+
+$SUDO apt update
+$SUDO apt install -y python3 python3-venv python3-dev libcamera-dev "$CAMERA_PACKAGE" \
+  libjpeg-dev zlib1g-dev libopenjp2-7 libtiff-dev libssl-dev libffi-dev git
 
 cd "$(dirname "$0")"
 
-python3.9 -m venv venv
+python3 -m venv --system-site-packages venv
 source venv/bin/activate
-pip install --upgrade pip
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 
-cat > requirements.txt <<EOF
-Flask==2.2.5
-Werkzeug==2.2.3
-numpy==1.20.3
-opencv-python-headless==4.5.1.48
-Pillow==9.5.0
-cryptography==39.0.0
-psutil==5.9.5
-qrcode[pil]==7.4.2
-yagmail==0.15.293
-pydrive2==1.19.0
-tflite-runtime==2.7.0
-loguru==0.7.2
-EOF
+if ! python -c 'import tflite_runtime' >/dev/null 2>&1; then
+  python -m pip install tflite-runtime || echo "Warning: TensorFlow Lite runtime is unavailable; AI person detection will be disabled."
+fi
 
-pip install -r requirements.txt
-
-mkdir -p config recordings exports logs models
-
-if [ ! -f config/config.json ]; then
-  if [ -f config/config_default.json ]; then
-    cp config/config_default.json config/config.json
-  else
-    echo "Missing config_default.json"
+MODEL="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)"
+if [[ "$MODEL" == *"Raspberry Pi 4"* || "$MODEL" == *"Raspberry Pi 5"* ]]; then
+  $SUDO apt install -y build-essential cmake libopenblas-dev liblapack-dev
+  if ! python -c 'import face_recognition' >/dev/null 2>&1; then
+    python -m pip install face-recognition || echo "Warning: face recognition runtime installation failed; install face-recognition before enabling it."
   fi
 fi
+
+mkdir -p config recordings exports logs models
 
 echo "=== Setup Complete ==="
 echo "Run ME Camera with:"

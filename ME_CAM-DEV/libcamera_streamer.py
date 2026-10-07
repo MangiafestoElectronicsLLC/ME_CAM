@@ -1,4 +1,5 @@
 import subprocess
+import shutil
 import threading
 import time
 from typing import Generator, Optional
@@ -25,9 +26,11 @@ class LibcameraMJPEGStreamer:
         self._running = False
 
     def _build_command(self):
+        camera_app = shutil.which("rpicam-vid") or shutil.which("libcamera-vid") or "rpicam-vid"
         return [
-            "libcamera-vid",
+            camera_app,
             "-t", "0",
+            "--nopreview",
             "--inline",
             "--codec", "mjpeg",
             "--width", str(self.width),
